@@ -1932,6 +1932,222 @@ export async function getProductAnalyticsSummary(tenantId: number) {
   };
 }
 
+/**
+ * ═══════════════════════════════════════════════════════════════════
+ * Product Analytics — visão de gestor sênior comercial
+ * ═══════════════════════════════════════════════════════════════════
+ * Funções abaixo correlacionam venda real (deal_products em deals
+ * status='won') com custo do catálogo (productCatalog.costPriceCents
+ * ou costPerUnitCents conforme pricingMode). Aceitam range de data
+ * via deals.createdAt.
+ *
+ * Limitação conhecida: deal_products não armazena snapshot de custo
+ * — usamos custo atual do catálogo como aproximação. Se um produto
+ * tinha custo R$50 ontem e hoje R$80, a margem histórica reflete o
+ * R$80 atual.
+ */
+
+interface ProductAnalyticsFilters {
+  tenantId: number;
+  dateFrom?: string; // YYYY-MM-DD
+  dateTo?: string;
+}
+
+function safeInt(n: number | undefined): number | undefined {
+  if (n === undefined || n === null) return undefined;
+  const v = Number(n);
+  if (!Number.isFinite(v)) return undefined;
+  return Math.trunc(v);
+}
+
+function dateConds(prefix: string, f: ProductAnalyticsFilters): string {
+  const parts: string[] = [];
+  if (f.dateFrom) parts.push(`AND ${prefix}."createdAt" >= '${f.dateFrom} 00:00:00'`);
+  if (f.dateTo) parts.push(`AND ${prefix}."createdAt" <= '${f.dateTo} 23:59:59'`);
+  return parts.join(" ");
+}
+
+export interface ProductCommercialSummary {
+  totalProducts: number;
+  activeProducts: number;
+  totalRevenueCents: number;       // SUM(finalPriceCents) WHERE won
+  totalCostCents: number;          // SUM(estimated cost) WHERE won
+  totalProfitCents: number;        // revenue - cost
+  marginPercent: number;           // (revenue - cost) / revenue × 100
+  avgTicketCents: number;          // revenue / count(deals)
+  dealsWithProducts: number;
+  totalUnitsSold: number;          // SUM(quantity) approx
+  productsSoldCount: number;       // COUNT(DISTINCT productId) com pelo menos 1 venda
+}
+
+/** Sumário comercial: receita / lucro / margem / ticket — base do dashboard. */
+export async function getProductCommercialSummary(f: ProductAnalyticsFilters): Promise<ProductCommercialSummary> {
+  const empty: ProductCommercialSummary = {
+    totalProducts: 0, activeProducts: 0, totalRevenueCents: 0, totalCostCents: 0,
+    totalProfitCents: 0, marginPercent: 0, avgTicketCents: 0, dealsWithProducts: 0,
+    totalUnitsSold: 0, productsSoldCount: 0,
+  };
+  const db = await getDb();
+  if (!db) return empty;
+
+  const tenantId = safeInt(f.tenantId);
+  if (!tenantId) return empty;
+
+  // Catálogo: total + ativos
+  const [catRow] = await db.select({
+    total: count(),
+    active: sql<number>`SUM(CASE WHEN ${productCatalog.isActive} = true THEN 1 ELSE 0 END)`,
+  }).from(productCatalog).where(eq(productCatalog.tenantId, tenantId));
+
+  const dCond = dateConds("d", f);
+
+  // Receita + custo + ticket. Custo é calculado por modo:
+  //  - per_unit: pc.costPerUnitCents × dp.quantityPerUnit
+  //  - fixed   : pc.costPriceCents × dp.quantity
+  // Usamos COALESCE(0) pra produtos sem custo cadastrado.
+  const result = rowsOf(await db.execute(sql.raw(`
+    SELECT
+      COALESCE(SUM(dp."finalPriceCents"), 0)::bigint AS revenue,
+      COALESCE(SUM(
+        CASE
+          WHEN dp."pricingMode" = 'per_unit'
+            THEN COALESCE(pc."costPerUnitCents", 0) * COALESCE(dp."quantityPerUnit", 1)
+          ELSE COALESCE(pc."costPriceCents", 0) * COALESCE(dp.quantity, 1)
+        END
+      ), 0)::bigint AS cost,
+      COUNT(DISTINCT dp."dealId")::int AS deals_count,
+      COALESCE(SUM(
+        CASE WHEN dp."pricingMode" = 'per_unit'
+          THEN COALESCE(dp."quantityPerUnit", 0)
+          ELSE COALESCE(dp.quantity, 0)
+        END
+      ), 0)::float AS units,
+      COUNT(DISTINCT dp."productId")::int AS distinct_products
+    FROM deal_products dp
+    INNER JOIN deals d ON d.id = dp."dealId" AND d."tenantId" = dp."tenantId" AND d."deletedAt" IS NULL
+    LEFT JOIN product_catalog pc ON pc.id = dp."productId" AND pc."tenantId" = dp."tenantId"
+    WHERE dp."tenantId" = ${tenantId}
+      AND d.status = 'won'
+      ${dCond}
+  `)))[0] as any || {};
+
+  const revenue = Number(result.revenue) || 0;
+  const cost = Number(result.cost) || 0;
+  const profit = revenue - cost;
+  const margin = revenue > 0 ? Math.round((profit / revenue) * 1000) / 10 : 0;
+  const dealsCount = Number(result.deals_count) || 0;
+
+  return {
+    totalProducts: Number(catRow?.total) || 0,
+    activeProducts: Number(catRow?.active) || 0,
+    totalRevenueCents: revenue,
+    totalCostCents: cost,
+    totalProfitCents: profit,
+    marginPercent: margin,
+    avgTicketCents: dealsCount > 0 ? Math.round(revenue / dealsCount) : 0,
+    dealsWithProducts: dealsCount,
+    totalUnitsSold: Math.round(Number(result.units) * 100) / 100,
+    productsSoldCount: Number(result.distinct_products) || 0,
+  };
+}
+
+export interface ProductRankingRow {
+  productId: number | null;
+  name: string;
+  category: string;
+  pricingMode: string;
+  unitOfMeasure: string | null;
+  imageUrl: string | null;
+  dealsCount: number;
+  unitsSold: number;
+  revenueCents: number;
+  costCents: number;
+  profitCents: number;
+  marginPercent: number;
+  conversionRate: number;        // won / (won+lost)
+  wonDeals: number;
+  lostDeals: number;
+}
+
+/**
+ * Tabela master: todos os produtos que apareceram em deals (won OU lost)
+ * no período. Calcula receita/lucro só dos won; conversão considera
+ * ambos. Ordenação default por receita descendente.
+ */
+export async function getProductCommercialRanking(f: ProductAnalyticsFilters & { limit?: number }): Promise<ProductRankingRow[]> {
+  const db = await getDb();
+  if (!db) return [];
+  const tenantId = safeInt(f.tenantId);
+  if (!tenantId) return [];
+  const limit = Math.min(Math.max(safeInt(f.limit) ?? 50, 1), 200);
+  const dCond = dateConds("d", f);
+
+  const rows = rowsOf(await db.execute(sql.raw(`
+    SELECT
+      dp."productId" AS "productId",
+      MIN(dp.name) AS name,
+      MIN(dp.category::text) AS category,
+      COALESCE(MIN(dp."pricingMode"), 'fixed') AS "pricingMode",
+      MIN(dp."unitOfMeasure") AS "unitOfMeasure",
+      MIN(dp."imageUrl") AS "imageUrl",
+      COUNT(DISTINCT d.id)::int AS "dealsCount",
+      COUNT(DISTINCT CASE WHEN d.status = 'won' THEN d.id END)::int AS "wonDeals",
+      COUNT(DISTINCT CASE WHEN d.status = 'lost' THEN d.id END)::int AS "lostDeals",
+      COALESCE(SUM(
+        CASE WHEN d.status = 'won' THEN
+          CASE WHEN dp."pricingMode" = 'per_unit'
+            THEN COALESCE(dp."quantityPerUnit", 0)
+            ELSE COALESCE(dp.quantity, 0)
+          END
+        ELSE 0 END
+      ), 0)::float AS "unitsSold",
+      COALESCE(SUM(CASE WHEN d.status = 'won' THEN dp."finalPriceCents" ELSE 0 END), 0)::bigint AS "revenueCents",
+      COALESCE(SUM(
+        CASE WHEN d.status = 'won' THEN
+          CASE WHEN dp."pricingMode" = 'per_unit'
+            THEN COALESCE(pc."costPerUnitCents", 0) * COALESCE(dp."quantityPerUnit", 1)
+            ELSE COALESCE(pc."costPriceCents", 0) * COALESCE(dp.quantity, 1)
+          END
+        ELSE 0 END
+      ), 0)::bigint AS "costCents"
+    FROM deal_products dp
+    INNER JOIN deals d ON d.id = dp."dealId" AND d."tenantId" = dp."tenantId" AND d."deletedAt" IS NULL
+    LEFT JOIN product_catalog pc ON pc.id = dp."productId" AND pc."tenantId" = dp."tenantId"
+    WHERE dp."tenantId" = ${tenantId}
+      AND d.status IN ('won', 'lost')
+      ${dCond}
+    GROUP BY dp."productId"
+    ORDER BY "revenueCents" DESC
+    LIMIT ${limit}
+  `)));
+
+  return rows.map((r: any) => {
+    const revenue = Number(r.revenueCents) || 0;
+    const cost = Number(r.costCents) || 0;
+    const profit = revenue - cost;
+    const margin = revenue > 0 ? Math.round((profit / revenue) * 1000) / 10 : 0;
+    const decided = (Number(r.wonDeals) || 0) + (Number(r.lostDeals) || 0);
+    const conversion = decided > 0 ? Math.round((Number(r.wonDeals) / decided) * 1000) / 10 : 0;
+    return {
+      productId: r.productId,
+      name: r.name || "—",
+      category: r.category || "other",
+      pricingMode: r.pricingMode || "fixed",
+      unitOfMeasure: r.unitOfMeasure || null,
+      imageUrl: r.imageUrl || null,
+      dealsCount: Number(r.dealsCount) || 0,
+      unitsSold: Math.round(Number(r.unitsSold) * 100) / 100,
+      revenueCents: revenue,
+      costCents: cost,
+      profitCents: profit,
+      marginPercent: margin,
+      conversionRate: conversion,
+      wonDeals: Number(r.wonDeals) || 0,
+      lostDeals: Number(r.lostDeals) || 0,
+    };
+  });
+}
+
 /** Top locations by revenue */
 export async function getProductAnalyticsTopLocations(tenantId: number, limit = 10) {
   const db = await getDb(); if (!db) return [];

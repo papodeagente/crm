@@ -1,479 +1,523 @@
-import { useState, useMemo, useEffect, useRef } from "react";
+/**
+ * ProductReports — Dashboard comercial sênior de produtos.
+ *
+ * Foco: ajudar o gestor a decidir onde investir esforço — qual produto
+ * traz mais receita, qual gera mais lucro absoluto, qual tem a melhor
+ * margem, qual está sendo perdido. Cada bloco vem com benchmark e
+ * diagnóstico narrativo no final.
+ *
+ * Fonte: getProductCommercialSummary + getProductCommercialRanking
+ * (correlaciona deal_products com product_catalog para custo).
+ */
+import { useMemo } from "react";
 import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
-import { useAuth } from "@/_core/hooks/useAuth";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from "@/components/ui/select";
-import {
-  ArrowLeft, Package, TrendingUp, TrendingDown, BarChart3,
-  DollarSign, ShoppingCart, Target, MapPin, Loader2, Download,
-  Plane, Hotel, Map, Bus, Shield, Ship, Stamp, Box, PieChart,
-  Award, XCircle, Star,
+  ArrowLeft, DollarSign, TrendingUp, Target, Coins, Loader2,
+  Award, Sparkles, AlertTriangle, Trophy, Package, BarChart3,
 } from "lucide-react";
-
-/* ─── Types ─── */
-interface AnalyticsRow {
-  name: string; category: string; catalogProductId: number | null;
-  dealCount: number; totalQuantity: number;
-  totalRevenueCents?: number; totalValueCents?: number;
-}
-interface ConversionRow {
-  name: string; category: string; catalogProductId: number | null;
-  totalDeals: number; wonDeals: number; conversionRate: number;
-}
-interface RevenueByTypeRow {
-  category: string; dealCount: number; totalQuantity: number; totalRevenueCents: number;
-}
-interface DestinationRow {
-  destination: string; productCount: number; totalBasePriceCents: number;
-}
-
-const PRODUCT_TYPES: Record<string, { label: string; icon: any; color: string; bgColor: string; chartColor: string }> = {
-  servico: { label: "Servico", icon: Package, color: "text-sky-400", bgColor: "bg-sky-500/15", chartColor: "#38bdf8" },
-  pacote: { label: "Pacote", icon: Package, color: "text-indigo-400", bgColor: "bg-indigo-500/15", chartColor: "#818cf8" },
-  consulta: { label: "Consulta", icon: Map, color: "text-emerald-400", bgColor: "bg-emerald-500/15", chartColor: "#34d399" },
-  procedimento: { label: "Procedimento", icon: Shield, color: "text-rose-400", bgColor: "bg-rose-500/15", chartColor: "#fb7185" },
-  assinatura: { label: "Assinatura", icon: Stamp, color: "text-violet-400", bgColor: "bg-violet-500/15", chartColor: "#a78bfa" },
-  produto: { label: "Produto", icon: Box, color: "text-amber-400", bgColor: "bg-amber-500/15", chartColor: "#fbbf24" },
-  other: { label: "Outro", icon: Box, color: "text-slate-400", bgColor: "bg-slate-500/15", chartColor: "#94a3b8" },
-};
+import DateRangeFilter, { useDateFilter } from "@/components/DateRangeFilter";
 
 function formatCurrency(cents: number): string {
   return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(cents / 100);
 }
-
 function formatCompact(cents: number): string {
-  const value = cents / 100;
-  if (value >= 1_000_000) return `R$ ${(value / 1_000_000).toFixed(1)}M`;
-  if (value >= 1_000) return `R$ ${(value / 1_000).toFixed(1)}K`;
+  const v = cents / 100;
+  if (Math.abs(v) >= 1_000_000) return `R$ ${(v / 1_000_000).toFixed(1)}M`;
+  if (Math.abs(v) >= 1_000) return `R$ ${(v / 1_000).toFixed(1)}K`;
   return formatCurrency(cents);
 }
+function formatNumber(n: number): string {
+  return new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 1 }).format(n);
+}
 
-/* ─── Horizontal Bar Chart ─── */
-function HorizontalBarChart({
-  data, valueKey, labelKey, colorFn, formatValue,
-}: {
-  data: any[]; valueKey: string; labelKey: string;
-  colorFn: (item: any, idx: number) => string;
-  formatValue: (val: number) => string;
+// Benchmarks de mercado para clínica de estética:
+//  - Margem saudável: ≥40% (procedimentos premium); aceitável 25–40%; alerta <25%.
+//  - Conversão saudável: ≥50% pós-consulta; mediano 30–50%; baixo <30%.
+function diagnoseMargin(rate: number): { tone: "ok" | "warn" | "alert"; label: string } {
+  if (rate >= 40) return { tone: "ok", label: "Saudável" };
+  if (rate >= 25) return { tone: "warn", label: "Aceitável" };
+  return { tone: "alert", label: "Alerta" };
+}
+function diagnoseConversion(rate: number, decided: number): { tone: "ok" | "warn" | "alert"; label: string } {
+  if (decided === 0) return { tone: "warn", label: "Sem dados" };
+  if (rate >= 50) return { tone: "ok", label: "Saudável" };
+  if (rate >= 30) return { tone: "warn", label: "Mediano" };
+  return { tone: "alert", label: "Baixo" };
+}
+
+function ToneBadge({ tone, children }: { tone: "ok" | "warn" | "alert"; children: React.ReactNode }) {
+  const cls = tone === "ok"
+    ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/30"
+    : tone === "warn"
+    ? "bg-amber-500/10 text-amber-500 border-amber-500/30"
+    : "bg-red-500/10 text-red-500 border-red-500/30";
+  return <Badge variant="outline" className={`text-[10px] font-semibold ${cls}`}>{children}</Badge>;
+}
+
+interface KpiCardProps {
+  label: string;
+  value: string;
+  subtitle?: string;
+  icon: React.ComponentType<{ className?: string }>;
+  color: string;
+  bg: string;
+  badge?: { tone: "ok" | "warn" | "alert"; label: string };
+}
+function KpiCard({ label, value, subtitle, icon: Icon, color, bg, badge }: KpiCardProps) {
+  return (
+    <Card className="border-border/50">
+      <CardContent className="p-5">
+        <div className="flex items-start justify-between mb-3">
+          <div className={`h-9 w-9 rounded-xl flex items-center justify-center ${bg}`}>
+            <Icon className={`h-4.5 w-4.5 ${color}`} />
+          </div>
+          {badge && <ToneBadge tone={badge.tone}>{badge.label}</ToneBadge>}
+        </div>
+        <p className="text-[11.5px] font-semibold text-muted-foreground uppercase tracking-wider">{label}</p>
+        <p className="text-[26px] font-extrabold text-foreground leading-tight mt-1">{value}</p>
+        {subtitle && <p className="text-[11.5px] text-muted-foreground mt-1.5">{subtitle}</p>}
+      </CardContent>
+    </Card>
+  );
+}
+
+interface RankingRowItem {
+  productId: number | null;
+  name: string;
+  value: number;
+  suffix?: string;
+  formatter: (v: number) => string;
+}
+function MiniRanking({ title, icon: Icon, accent, items, emptyText }: {
+  title: string;
+  icon: React.ComponentType<{ className?: string }>;
+  accent: string;
+  items: RankingRowItem[];
+  emptyText: string;
 }) {
-  const maxVal = Math.max(...data.map((d) => Number(d[valueKey]) || 0), 1);
-
   return (
-    <div className="space-y-2.5">
-      {data.map((item, idx) => {
-        const val = Number(item[valueKey]) || 0;
-        const pct = (val / maxVal) * 100;
-        const typeInfo = PRODUCT_TYPES[item.category] || PRODUCT_TYPES.other;
-        const TypeIcon = typeInfo.icon;
-        return (
-          <div key={idx}>
-            <div className="flex items-center justify-between mb-1">
-              <div className="flex items-center gap-2 min-w-0 flex-1">
-                <div className={`h-6 w-6 rounded flex items-center justify-center shrink-0 ${typeInfo.bgColor}`}>
-                  <TypeIcon className={`h-3 w-3 ${typeInfo.color}`} />
-                </div>
-                <span className="text-xs font-medium text-foreground truncate">{item[labelKey]}</span>
-              </div>
-              <span className="text-xs font-semibold text-foreground ml-2 shrink-0">{formatValue(val)}</span>
-            </div>
-            <div className="h-2 rounded-full bg-muted/50 overflow-hidden">
-              <div
-                className="h-full rounded-full transition-all duration-500"
-                style={{ width: `${pct}%`, backgroundColor: colorFn(item, idx) }}
-              />
-            </div>
-          </div>
-        );
-      })}
-      {data.length === 0 && (
-        <p className="text-sm text-muted-foreground text-center py-6">Sem dados disponíveis</p>
-      )}
-    </div>
-  );
-}
-
-/* ─── Donut Chart (CSS-based) ─── */
-function DonutChart({ data }: { data: RevenueByTypeRow[] }) {
-  const total = data.reduce((acc, d) => acc + Number(d.totalRevenueCents || 0), 0);
-  if (total === 0) return <p className="text-sm text-muted-foreground text-center py-6">Sem dados disponíveis</p>;
-
-  let cumulative = 0;
-  const segments = data.map((d) => {
-    const pct = (Number(d.totalRevenueCents || 0) / total) * 100;
-    const start = cumulative;
-    cumulative += pct;
-    const typeInfo = PRODUCT_TYPES[d.category] || PRODUCT_TYPES.other;
-    return { ...d, pct, start, color: typeInfo.chartColor, label: typeInfo.label };
-  });
-
-  const gradientStops = segments.map((s) => `${s.color} ${s.start}% ${s.start + s.pct}%`).join(", ");
-
-  return (
-    <div className="flex items-center gap-6">
-      <div className="relative shrink-0">
-        <div
-          className="h-36 w-36 rounded-full"
-          style={{ background: `conic-gradient(${gradientStops})` }}
-        />
-        <div className="absolute inset-4 rounded-full bg-card flex items-center justify-center">
-          <div className="text-center">
-            <p className="text-lg font-bold text-foreground">{formatCompact(total)}</p>
-            <p className="text-[10px] text-muted-foreground">Total</p>
-          </div>
-        </div>
-      </div>
-      <div className="space-y-2 flex-1 min-w-0">
-        {segments.map((s, idx) => (
-          <div key={idx} className="flex items-center gap-2">
-            <div className="h-2.5 w-2.5 rounded-sm shrink-0" style={{ backgroundColor: s.color }} />
-            <span className="text-xs text-foreground truncate flex-1">{s.label}</span>
-            <span className="text-xs font-medium text-muted-foreground shrink-0">{s.pct.toFixed(0)}%</span>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-/* ─── Conversion Rate Chart ─── */
-function ConversionChart({ data }: { data: ConversionRow[] }) {
-  return (
-    <div className="space-y-3">
-      {data.map((item, idx) => {
-        const rate = Number(item.conversionRate) || 0;
-        const typeInfo = PRODUCT_TYPES[item.category] || PRODUCT_TYPES.other;
-        return (
-          <div key={idx}>
-            <div className="flex items-center justify-between mb-1">
-              <span className="text-xs font-medium text-foreground truncate flex-1">{item.name}</span>
-              <div className="flex items-center gap-2 shrink-0">
-                <span className="text-[11px] text-muted-foreground">{Number(item.wonDeals)}/{Number(item.totalDeals)}</span>
-                <span className={`text-xs font-bold ${rate >= 50 ? "text-emerald-500" : rate >= 25 ? "text-amber-500" : "text-rose-500"}`}>
-                  {rate.toFixed(0)}%
+    <Card className="border-border/50 h-full">
+      <CardHeader className="pb-2">
+        <CardTitle className="text-[13px] flex items-center gap-1.5">
+          <Icon className={`h-3.5 w-3.5 ${accent}`} />
+          {title}
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="pt-0">
+        {items.length === 0 ? (
+          <p className="text-[11.5px] text-muted-foreground py-3 text-center">{emptyText}</p>
+        ) : (
+          <ol className="space-y-1.5">
+            {items.map((it, idx) => (
+              <li key={`${it.productId ?? "x"}-${idx}`} className="flex items-center gap-2 text-[12.5px]">
+                <span className="w-4 text-[10.5px] text-muted-foreground tabular-nums">{idx + 1}.</span>
+                <span className="flex-1 truncate font-medium" title={it.name}>{it.name}</span>
+                <span className="font-semibold tabular-nums shrink-0">
+                  {it.formatter(it.value)}
+                  {it.suffix && <span className="text-muted-foreground ml-0.5">{it.suffix}</span>}
                 </span>
-              </div>
-            </div>
-            <div className="h-2 rounded-full bg-muted/50 overflow-hidden">
-              <div
-                className="h-full rounded-full transition-all duration-500"
-                style={{
-                  width: `${rate}%`,
-                  backgroundColor: rate >= 50 ? "#34d399" : rate >= 25 ? "#fbbf24" : "#fb7185",
-                }}
-              />
-            </div>
-          </div>
-        );
-      })}
-      {data.length === 0 && (
-        <p className="text-sm text-muted-foreground text-center py-6">Sem dados disponíveis</p>
-      )}
-    </div>
+              </li>
+            ))}
+          </ol>
+        )}
+      </CardContent>
+    </Card>
   );
 }
 
-/* ─── Main Page ─── */
-export default function ProductReportsPage() {
-  const [, setLocation] = useLocation();
-  const { user } = useAuth();
-  const saasMe = trpc.saasAuth.me.useQuery(undefined, { retry: 1, refetchOnWindowFocus: false, staleTime: 5 * 60 * 1000 });
-  const isAdmin = saasMe.data?.role === "admin" || saasMe.data?.isSuperAdmin;
-  // Queries
-  const summaryQ = trpc.productCatalog.analytics.summary.useQuery();
-  const mostSoldQ = trpc.productCatalog.analytics.mostSold.useQuery({ limit: 10 });
-  const mostLostQ = trpc.productCatalog.analytics.mostLost.useQuery({ limit: 10 });
-  const mostRequestedQ = trpc.productCatalog.analytics.mostRequested.useQuery({ limit: 10 });
-  const revenueByTypeQ = trpc.productCatalog.analytics.revenueByType.useQuery();
-  const conversionQ = trpc.productCatalog.analytics.conversionRate.useQuery({ limit: 10 });
-  const topDestQ = trpc.productCatalog.analytics.topDestinations.useQuery({ limit: 10 });
+export default function ProductReports() {
+  const [, navigate] = useLocation();
+  const dateFilter = useDateFilter("last3months");
 
-  const summary = summaryQ.data;
-  const isLoading = summaryQ.isLoading;
+  const filterInput = useMemo(() => ({
+    dateFrom: dateFilter.dates.dateFrom,
+    dateTo: dateFilter.dates.dateTo,
+  }), [dateFilter.dates]);
 
-  // Export CSV
-  function exportCSV() {
-    const rows = (mostSoldQ.data || []) as AnalyticsRow[];
-    if (rows.length === 0) { return; }
-    const header = "Produto,Categoria,Quantidade,Receita\n";
-    const csv = rows.map((r) =>
-      `"${r.name}","${PRODUCT_TYPES[r.category]?.label || r.category}",${Number(r.totalQuantity)},${Number(r.totalRevenueCents || 0) / 100}`
-    ).join("\n");
-    const blob = new Blob([header + csv], { type: "text/csv" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url; a.download = "produtos-mais-vendidos.csv"; a.click();
-    URL.revokeObjectURL(url);
-  }
+  const summaryQ = trpc.productCatalog.analytics.commercialSummary.useQuery(filterInput);
+  const rankingQ = trpc.productCatalog.analytics.commercialRanking.useQuery({ ...filterInput, limit: 50 });
+
+  const m = summaryQ.data;
+  const ranking = rankingQ.data || [];
+
+  // Top 5 rankings derivados do ranking master
+  const topRevenue = useMemo(() =>
+    [...ranking].sort((a, b) => b.revenueCents - a.revenueCents).slice(0, 5)
+  , [ranking]);
+  const topProfit = useMemo(() =>
+    [...ranking].filter(r => r.profitCents > 0).sort((a, b) => b.profitCents - a.profitCents).slice(0, 5)
+  , [ranking]);
+  const topVolume = useMemo(() =>
+    [...ranking].sort((a, b) => b.unitsSold - a.unitsSold).slice(0, 5)
+  , [ranking]);
+  const topMargin = useMemo(() =>
+    [...ranking]
+      .filter(r => r.dealsCount >= 2 && r.revenueCents > 0)  // exige volume mínimo pra margem ser confiável
+      .sort((a, b) => b.marginPercent - a.marginPercent)
+      .slice(0, 5)
+  , [ranking]);
+
+  const marginDx = m ? diagnoseMargin(m.marginPercent) : null;
+
+  // Diagnóstico narrativo dinâmico
+  const narrative = useMemo(() => {
+    if (!m) return [];
+    const lines: string[] = [];
+    if (m.dealsWithProducts === 0) {
+      lines.push("Nenhuma venda registrada no período. Antes de avaliar produtos, é preciso ter movimento — confirme se há negociações marcadas como ganhas.");
+      return lines;
+    }
+    lines.push(
+      `No período selecionado, **${m.dealsWithProducts} negociações** foram fechadas com produtos vinculados, gerando **${formatCompact(m.totalRevenueCents)}** em receita e **${formatCompact(m.totalProfitCents)}** em lucro bruto (margem média de **${m.marginPercent}%**${marginDx ? ` — ${marginDx.label.toLowerCase()}` : ""}).`,
+    );
+
+    if (topRevenue.length > 0 && topProfit.length > 0) {
+      const cashCow = topRevenue[0];
+      const profitKing = topProfit[0];
+      if (cashCow.productId === profitKing.productId) {
+        lines.push(
+          `**${cashCow.name}** é simultaneamente o maior gerador de receita (${formatCompact(cashCow.revenueCents)}) e de lucro (${formatCompact(cashCow.profitCents)}, margem ${cashCow.marginPercent}%) — produto âncora do mix. Mantenha estoque, treinamento e comunicação focados nele.`,
+        );
+      } else {
+        lines.push(
+          `O carro-chefe em receita é **${cashCow.name}** (${formatCompact(cashCow.revenueCents)}, margem ${cashCow.marginPercent}%), mas quem mais entrega lucro em reais é **${profitKing.name}** (${formatCompact(profitKing.profitCents)}, margem ${profitKing.marginPercent}%). Volume nem sempre é lucratividade — vale priorizar comunicação para os dois lados conforme o objetivo do mês.`,
+        );
+      }
+    }
+
+    if (topMargin.length > 0) {
+      const best = topMargin[0];
+      lines.push(
+        `Maior margem percentual: **${best.name}** com ${best.marginPercent}% (lucro de ${formatCompact(best.profitCents)} em ${best.wonDeals} venda(s)). Produto candidato a campanha — cada deal aqui rende mais por R$ investido.`,
+      );
+    }
+
+    // Diagnóstico de conversão (produtos populares mas que perdem muito)
+    const lowConvHighDemand = ranking.filter(r => r.dealsCount >= 3 && r.conversionRate > 0 && r.conversionRate < 30);
+    if (lowConvHighDemand.length > 0) {
+      const worst = [...lowConvHighDemand].sort((a, b) => a.conversionRate - b.conversionRate)[0];
+      lines.push(
+        `Atenção: **${worst.name}** aparece em ${worst.dealsCount} negociações mas só fecha em ${worst.conversionRate}% delas (${worst.lostDeals} perdas). Revisar abordagem comercial, preço ou qualificação de leads pra esse produto.`,
+      );
+    }
+
+    // Margem negativa
+    const negative = ranking.filter(r => r.profitCents < 0 && r.wonDeals > 0);
+    if (negative.length > 0) {
+      const names = negative.slice(0, 3).map(n => n.name).join(", ");
+      lines.push(
+        `**Crítico:** ${negative.length} produto(s) está(ão) sendo vendido(s) abaixo do custo (${names}${negative.length > 3 ? " e outros" : ""}). Cada venda dessas é prejuízo — corrigir cadastro de custo ou repreçar imediatamente.`,
+      );
+    }
+
+    return lines;
+  }, [m, topRevenue, topProfit, topMargin, ranking, marginDx]);
+
+  // Recomendações dinâmicas
+  const recommendations = useMemo(() => {
+    if (!m || m.dealsWithProducts === 0) return [];
+    const recs: string[] = [];
+
+    if (m.marginPercent < 25) {
+      recs.push("Margem média abaixo de 25% — auditar custos no catálogo e repreçar produtos mais sensíveis. Estética premium deveria operar acima de 35%.");
+    }
+    const noCost = ranking.filter(r => r.wonDeals > 0 && r.costCents === 0);
+    if (noCost.length >= 3) {
+      recs.push(`${noCost.length} produto(s) vendido(s) sem custo cadastrado — sem isso, margem vira chute. Edite o produto e preencha o custo (ou custo por mL).`);
+    }
+    const lossLeaders = [...ranking].filter(r => r.lostDeals >= 3 && r.lostDeals > r.wonDeals);
+    if (lossLeaders.length > 0) {
+      const top = lossLeaders[0];
+      recs.push(`Produto **${top.name}** está sendo recusado mais do que aceito (${top.lostDeals} perdas vs ${top.wonDeals} ganhos). Avaliar motivos de perda no relatório comercial.`);
+    }
+    const highMarginLowVolume = topMargin.filter(r => r.unitsSold < 5);
+    if (highMarginLowVolume.length > 0) {
+      const top = highMarginLowVolume[0];
+      recs.push(`**${top.name}** tem margem excelente (${top.marginPercent}%) mas pouco volume (${top.unitsSold} ${top.unitOfMeasure || "un"}). Faça campanha — cada incremento aqui é altamente rentável.`);
+    }
+    if (recs.length === 0) {
+      recs.push("Mix de produtos saudável. Próximo passo natural: definir metas mensais por produto top (receita e volume) e medir variação MoM.");
+    }
+    return recs;
+  }, [m, ranking, topMargin]);
+
+  const isLoading = summaryQ.isLoading || rankingQ.isLoading;
 
   return (
-    <div className="page-content max-w-7xl mx-auto">
+    <div className="container max-w-7xl mx-auto px-4 sm:px-6 py-6 space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center gap-3">
-          <button onClick={() => setLocation("/insights")} className="p-2 rounded-lg hover:bg-muted transition-colors">
-            <ArrowLeft className="h-5 w-5 text-muted-foreground" />
+      <div className="flex items-start justify-between gap-4 flex-wrap">
+        <div className="flex items-start gap-3">
+          <button
+            onClick={() => navigate("/analytics")}
+            className="h-9 w-9 rounded-lg bg-muted hover:bg-muted/80 flex items-center justify-center shrink-0"
+            aria-label="Voltar"
+          >
+            <ArrowLeft className="h-4 w-4" />
           </button>
-          <div className="h-10 w-10 rounded-xl flex items-center justify-center" style={{
-            background: "linear-gradient(135deg, oklch(0.55 0.20 200), oklch(0.60 0.25 270))"
-          }}>
-            <BarChart3 className="h-5 w-5 text-white" />
-          </div>
           <div>
-            <h1 className="text-2xl font-semibold tracking-tight text-foreground">Relatórios de Produtos</h1>
-            <p className="text-[13px] text-muted-foreground mt-0.5">Análise de desempenho do catálogo turístico</p>
+            <h1 className="text-[22px] font-extrabold tracking-tight">Análise comercial de produtos</h1>
+            <p className="text-[13px] text-muted-foreground">
+              Onde a clínica gera receita, lucro e margem — por produto, com diagnóstico de gestor sênior.
+            </p>
           </div>
         </div>
-        <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={() => setLocation("/settings/products")}>
-            <Package className="h-4 w-4 mr-1.5" />
-            Catálogo
-          </Button>
-          {isAdmin && (
-            <Button variant="outline" size="sm" onClick={exportCSV}>
-              <Download className="h-4 w-4 mr-1.5" />
-              Exportar CSV
-            </Button>
-          )}
-        </div>
+        <DateRangeFilter
+          compact
+          preset={dateFilter.preset}
+          onPresetChange={dateFilter.setPreset}
+          customFrom={dateFilter.customFrom}
+          onCustomFromChange={dateFilter.setCustomFrom}
+          customTo={dateFilter.customTo}
+          onCustomToChange={dateFilter.setCustomTo}
+          onReset={dateFilter.reset}
+        />
       </div>
 
       {isLoading ? (
-        <div className="flex items-center justify-center h-64">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <div className="flex items-center justify-center py-20">
+          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
         </div>
+      ) : !m ? (
+        <Card><CardContent className="py-10 text-center text-muted-foreground">Sem dados.</CardContent></Card>
       ) : (
         <>
-          {/* Summary Cards */}
-          <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mb-6">
-            <div className="rounded-xl border border-border bg-card p-4">
-              <div className="flex items-center gap-2 mb-2">
-                <div className="h-8 w-8 rounded-lg flex items-center justify-center bg-violet-500/15">
-                  <Package className="h-4 w-4 text-violet-400" />
-                </div>
-              </div>
-              <p className="text-2xl font-bold text-foreground">{summary?.totalProducts ?? 0}</p>
-              <p className="text-xs text-muted-foreground">Produtos no Catálogo</p>
-            </div>
-            <div className="rounded-xl border border-border bg-card p-4">
-              <div className="flex items-center gap-2 mb-2">
-                <div className="h-8 w-8 rounded-lg flex items-center justify-center bg-emerald-500/15">
-                  <TrendingUp className="h-4 w-4 text-emerald-400" />
-                </div>
-              </div>
-              <p className="text-2xl font-bold text-emerald-500">{summary?.activeProducts ?? 0}</p>
-              <p className="text-xs text-muted-foreground">Produtos Ativos</p>
-            </div>
-            <div className="rounded-xl border border-border bg-card p-4">
-              <div className="flex items-center gap-2 mb-2">
-                <div className="h-8 w-8 rounded-lg flex items-center justify-center bg-sky-500/15">
-                  <DollarSign className="h-4 w-4 text-sky-400" />
-                </div>
-              </div>
-              <p className="text-2xl font-bold text-foreground">{formatCompact(summary?.avgPriceCents ?? 0)}</p>
-              <p className="text-xs text-muted-foreground">Preço Médio</p>
-            </div>
-            <div className="rounded-xl border border-border bg-card p-4">
-              <div className="flex items-center gap-2 mb-2">
-                <div className="h-8 w-8 rounded-lg flex items-center justify-center bg-amber-500/15">
-                  <ShoppingCart className="h-4 w-4 text-amber-400" />
-                </div>
-              </div>
-              <p className="text-2xl font-bold text-foreground">{formatCompact(summary?.totalRevenueCents ?? 0)}</p>
-              <p className="text-xs text-muted-foreground">Receita Total</p>
-            </div>
-            <div className="rounded-xl border border-border bg-card p-4">
-              <div className="flex items-center gap-2 mb-2">
-                <div className="h-8 w-8 rounded-lg flex items-center justify-center bg-rose-500/15">
-                  <Target className="h-4 w-4 text-rose-400" />
-                </div>
-              </div>
-              <p className="text-2xl font-bold text-foreground">{summary?.dealsWithProducts ?? 0}</p>
-              <p className="text-xs text-muted-foreground">Negociações com Produtos</p>
-            </div>
+          {/* Executive summary — 4 cards */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <KpiCard
+              label="Receita"
+              value={formatCompact(m.totalRevenueCents)}
+              subtitle={`${m.dealsWithProducts} ${m.dealsWithProducts === 1 ? "negociação" : "negociações"} fechadas`}
+              icon={DollarSign}
+              color="text-emerald-500"
+              bg="bg-emerald-500/10"
+            />
+            <KpiCard
+              label="Lucro bruto"
+              value={formatCompact(m.totalProfitCents)}
+              subtitle={`Receita − custo dos produtos vendidos`}
+              icon={Coins}
+              color="text-blue-500"
+              bg="bg-blue-500/10"
+            />
+            <KpiCard
+              label="Margem média"
+              value={`${m.marginPercent}%`}
+              subtitle="Lucro ÷ receita (ponderada)"
+              icon={TrendingUp}
+              color="text-violet-500"
+              bg="bg-violet-500/10"
+              badge={marginDx || undefined}
+            />
+            <KpiCard
+              label="Ticket médio"
+              value={formatCompact(m.avgTicketCents)}
+              subtitle={`${formatNumber(m.totalUnitsSold)} ${m.totalUnitsSold === 1 ? "unidade" : "unidades"} vendidas`}
+              icon={Target}
+              color="text-amber-500"
+              bg="bg-amber-500/10"
+            />
           </div>
 
-          {/* Charts Grid */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
-            {/* Most Sold */}
-            <div className="rounded-xl border border-border bg-card p-5">
-              <div className="flex items-center gap-2 mb-4">
-                <div className="h-8 w-8 rounded-lg flex items-center justify-center bg-emerald-500/15">
-                  <Award className="h-4 w-4 text-emerald-400" />
-                </div>
-                <div>
-                  <h3 className="text-sm font-semibold text-foreground">Mais Vendidos</h3>
-                  <p className="text-[11px] text-muted-foreground">Produtos em negociações ganhas</p>
-                </div>
-              </div>
-              <HorizontalBarChart
-                data={(mostSoldQ.data || []) as AnalyticsRow[]}
-                valueKey="totalQuantity"
-                labelKey="name"
-                colorFn={(item) => (PRODUCT_TYPES[item.category] || PRODUCT_TYPES.other).chartColor}
-                formatValue={(v) => `${v} un.`}
-              />
-            </div>
-
-            {/* Most Lost */}
-            <div className="rounded-xl border border-border bg-card p-5">
-              <div className="flex items-center gap-2 mb-4">
-                <div className="h-8 w-8 rounded-lg flex items-center justify-center bg-rose-500/15">
-                  <XCircle className="h-4 w-4 text-rose-400" />
-                </div>
-                <div>
-                  <h3 className="text-sm font-semibold text-foreground">Mais Perdidos</h3>
-                  <p className="text-[11px] text-muted-foreground">Produtos em negociações perdidas</p>
-                </div>
-              </div>
-              <HorizontalBarChart
-                data={(mostLostQ.data || []) as AnalyticsRow[]}
-                valueKey="totalQuantity"
-                labelKey="name"
-                colorFn={(item) => (PRODUCT_TYPES[item.category] || PRODUCT_TYPES.other).chartColor}
-                formatValue={(v) => `${v} un.`}
-              />
-            </div>
-
-            {/* Most Requested */}
-            <div className="rounded-xl border border-border bg-card p-5">
-              <div className="flex items-center gap-2 mb-4">
-                <div className="h-8 w-8 rounded-lg flex items-center justify-center bg-amber-500/15">
-                  <Star className="h-4 w-4 text-amber-400" />
-                </div>
-                <div>
-                  <h3 className="text-sm font-semibold text-foreground">Mais Solicitados</h3>
-                  <p className="text-[11px] text-muted-foreground">Produtos em todas as negociações</p>
-                </div>
-              </div>
-              <HorizontalBarChart
-                data={(mostRequestedQ.data || []) as AnalyticsRow[]}
-                valueKey="totalQuantity"
-                labelKey="name"
-                colorFn={(item) => (PRODUCT_TYPES[item.category] || PRODUCT_TYPES.other).chartColor}
-                formatValue={(v) => `${v} un.`}
-              />
-            </div>
-
-            {/* Revenue by Type (Donut) */}
-            <div className="rounded-xl border border-border bg-card p-5">
-              <div className="flex items-center gap-2 mb-4">
-                <div className="h-8 w-8 rounded-lg flex items-center justify-center bg-indigo-500/15">
-                  <PieChart className="h-4 w-4 text-indigo-400" />
-                </div>
-                <div>
-                  <h3 className="text-sm font-semibold text-foreground">Receita por Categoria</h3>
-                  <p className="text-[11px] text-muted-foreground">Distribuição de receita por tipo de produto</p>
-                </div>
-              </div>
-              <DonutChart data={(revenueByTypeQ.data || []) as RevenueByTypeRow[]} />
-            </div>
-
-            {/* Conversion Rate */}
-            <div className="rounded-xl border border-border bg-card p-5">
-              <div className="flex items-center gap-2 mb-4">
-                <div className="h-8 w-8 rounded-lg flex items-center justify-center bg-sky-500/15">
-                  <Target className="h-4 w-4 text-sky-400" />
-                </div>
-                <div>
-                  <h3 className="text-sm font-semibold text-foreground">Taxa de Conversão</h3>
-                  <p className="text-[11px] text-muted-foreground">Percentual de vendas ganhas por produto</p>
-                </div>
-              </div>
-              <ConversionChart data={(conversionQ.data || []) as ConversionRow[]} />
-            </div>
-
-            {/* Top Destinations */}
-            <div className="rounded-xl border border-border bg-card p-5">
-              <div className="flex items-center gap-2 mb-4">
-                <div className="h-8 w-8 rounded-lg flex items-center justify-center bg-cyan-500/15">
-                  <MapPin className="h-4 w-4 text-cyan-400" />
-                </div>
-                <div>
-                  <h3 className="text-sm font-semibold text-foreground">Top Locais</h3>
-                  <p className="text-[11px] text-muted-foreground">Locais com mais produtos no catalogo</p>
-                </div>
-              </div>
-              <div className="space-y-2.5">
-                {((topDestQ.data || []) as DestinationRow[]).map((dest, idx) => {
-                  const maxCount = Math.max(...((topDestQ.data || []) as DestinationRow[]).map((d) => Number(d.productCount)), 1);
-                  const pct = (Number(dest.productCount) / maxCount) * 100;
-                  return (
-                    <div key={idx}>
-                      <div className="flex items-center justify-between mb-1">
-                        <div className="flex items-center gap-2 min-w-0 flex-1">
-                          <MapPin className="h-3 w-3 text-cyan-400 shrink-0" />
-                          <span className="text-xs font-medium text-foreground truncate">{dest.destination}</span>
-                        </div>
-                        <span className="text-xs font-semibold text-foreground ml-2 shrink-0">{Number(dest.productCount)} produtos</span>
-                      </div>
-                      <div className="h-2 rounded-full bg-muted/50 overflow-hidden">
-                        <div className="h-full rounded-full bg-cyan-500 transition-all duration-500" style={{ width: `${pct}%` }} />
-                      </div>
-                    </div>
-                  );
-                })}
-                {(topDestQ.data || []).length === 0 && (
-                  <p className="text-sm text-muted-foreground text-center py-6">Sem dados disponíveis</p>
-                )}
-              </div>
-            </div>
+          {/* 4 mini rankings */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <MiniRanking
+              title="Top receita"
+              icon={Trophy}
+              accent="text-emerald-500"
+              items={topRevenue.map(r => ({
+                productId: r.productId,
+                name: r.name,
+                value: r.revenueCents,
+                formatter: formatCompact,
+              }))}
+              emptyText="Sem vendas no período"
+            />
+            <MiniRanking
+              title="Top lucro absoluto"
+              icon={Coins}
+              accent="text-blue-500"
+              items={topProfit.map(r => ({
+                productId: r.productId,
+                name: r.name,
+                value: r.profitCents,
+                formatter: formatCompact,
+              }))}
+              emptyText="Sem lucro no período (custo igual ou maior que receita)"
+            />
+            <MiniRanking
+              title="Top volume"
+              icon={Package}
+              accent="text-amber-500"
+              items={topVolume.map(r => ({
+                productId: r.productId,
+                name: r.name,
+                value: r.unitsSold,
+                suffix: r.unitOfMeasure || "un",
+                formatter: formatNumber,
+              }))}
+              emptyText="Sem unidades vendidas"
+            />
+            <MiniRanking
+              title="Top margem %"
+              icon={TrendingUp}
+              accent="text-violet-500"
+              items={topMargin.map(r => ({
+                productId: r.productId,
+                name: r.name,
+                value: r.marginPercent,
+                formatter: (v) => `${v}%`,
+              }))}
+              emptyText="Faltam dados de custo"
+            />
           </div>
 
-          {/* Revenue Table */}
-          <div className="rounded-xl border border-border bg-card p-5">
-            <div className="flex items-center gap-2 mb-4">
-              <div className="h-8 w-8 rounded-lg flex items-center justify-center bg-violet-500/15">
-                <DollarSign className="h-4 w-4 text-violet-400" />
-              </div>
-              <div>
-                <h3 className="text-sm font-semibold text-foreground">Receita Detalhada por Categoria</h3>
-                <p className="text-[11px] text-muted-foreground">Negociações ganhas agrupadas por tipo de produto</p>
-              </div>
-            </div>
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b border-border">
-                    <th className="text-left px-3 py-2 text-xs font-medium text-muted-foreground uppercase">Categoria</th>
-                    <th className="text-right px-3 py-2 text-xs font-medium text-muted-foreground uppercase">Negociações</th>
-                    <th className="text-right px-3 py-2 text-xs font-medium text-muted-foreground uppercase">Quantidade</th>
-                    <th className="text-right px-3 py-2 text-xs font-medium text-muted-foreground uppercase">Receita</th>
-                    <th className="text-right px-3 py-2 text-xs font-medium text-muted-foreground uppercase">Ticket Médio</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {((revenueByTypeQ.data || []) as RevenueByTypeRow[]).map((row, idx) => {
-                    const typeInfo = PRODUCT_TYPES[row.category] || PRODUCT_TYPES.other;
-                    const TypeIcon = typeInfo.icon;
-                    const avgTicket = Number(row.dealCount) > 0 ? Number(row.totalRevenueCents) / Number(row.dealCount) : 0;
-                    return (
-                      <tr key={idx} className="border-b border-border/50 hover:bg-muted/20 transition-colors">
-                        <td className="px-3 py-2.5">
-                          <div className="flex items-center gap-2">
-                            <div className={`h-6 w-6 rounded flex items-center justify-center ${typeInfo.bgColor}`}>
-                              <TypeIcon className={`h-3 w-3 ${typeInfo.color}`} />
-                            </div>
-                            <span className="text-sm font-medium text-foreground">{typeInfo.label}</span>
-                          </div>
-                        </td>
-                        <td className="px-3 py-2.5 text-right text-sm text-foreground">{Number(row.dealCount)}</td>
-                        <td className="px-3 py-2.5 text-right text-sm text-foreground">{Number(row.totalQuantity)}</td>
-                        <td className="px-3 py-2.5 text-right text-sm font-semibold text-foreground">{formatCurrency(Number(row.totalRevenueCents))}</td>
-                        <td className="px-3 py-2.5 text-right text-sm text-muted-foreground">{formatCurrency(avgTicket)}</td>
-                      </tr>
-                    );
-                  })}
-                  {(revenueByTypeQ.data || []).length === 0 && (
-                    <tr>
-                      <td colSpan={5} className="text-center py-6 text-sm text-muted-foreground">Sem dados disponíveis</td>
+          {/* Diagnóstico do gestor */}
+          <Card className="border-border/50">
+            <CardHeader>
+              <CardTitle className="text-[15px] flex items-center gap-2">
+                <Sparkles className="h-4 w-4 text-emerald-500" />
+                Diagnóstico do gestor
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3 text-[13.5px] leading-relaxed text-foreground/90">
+              {narrative.map((p, i) => (
+                <p key={i} dangerouslySetInnerHTML={{ __html: p.replace(/\*\*(.+?)\*\*/g, '<strong class="text-foreground">$1</strong>') }} />
+              ))}
+            </CardContent>
+          </Card>
+
+          {/* Tabela master */}
+          <Card className="border-border/50">
+            <CardHeader>
+              <CardTitle className="text-[15px] flex items-center gap-2">
+                <BarChart3 className="h-4 w-4 text-emerald-500" />
+                Análise por produto
+              </CardTitle>
+              <p className="text-[12px] text-muted-foreground">
+                Conversão considera apenas negociações decididas (ganha + perdida). Margem usa custo atual do catálogo.
+              </p>
+            </CardHeader>
+            <CardContent className="px-0">
+              <div className="overflow-x-auto">
+                <table className="w-full text-[12.5px]">
+                  <thead className="border-y border-border/40 bg-muted/30">
+                    <tr className="text-[10.5px] uppercase tracking-wider text-muted-foreground">
+                      <th className="text-left px-4 py-2 font-semibold">Produto</th>
+                      <th className="text-right px-3 py-2 font-semibold">Vendas</th>
+                      <th className="text-right px-3 py-2 font-semibold">Receita</th>
+                      <th className="text-right px-3 py-2 font-semibold">Lucro</th>
+                      <th className="text-right px-3 py-2 font-semibold">Margem</th>
+                      <th className="text-right px-3 py-2 font-semibold">Volume</th>
+                      <th className="text-right px-3 py-2 font-semibold">Conversão</th>
                     </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
+                  </thead>
+                  <tbody>
+                    {ranking.length === 0 ? (
+                      <tr>
+                        <td colSpan={7} className="text-center py-10 text-muted-foreground">
+                          Sem produtos no período selecionado.
+                        </td>
+                      </tr>
+                    ) : ranking.map((r) => {
+                      const mDx = diagnoseMargin(r.marginPercent);
+                      const cDx = diagnoseConversion(r.conversionRate, r.wonDeals + r.lostDeals);
+                      return (
+                        <tr key={r.productId ?? r.name} className="border-b border-border/30 hover:bg-muted/20">
+                          <td className="px-4 py-2.5">
+                            <div className="flex items-center gap-2">
+                              {r.imageUrl && (
+                                <img src={r.imageUrl} alt="" className="w-7 h-7 rounded object-cover shrink-0" />
+                              )}
+                              <div className="min-w-0">
+                                <p className="font-medium truncate">{r.name}</p>
+                                <p className="text-[10.5px] text-muted-foreground">
+                                  {r.category}
+                                  {r.pricingMode === "per_unit" && r.unitOfMeasure && (
+                                    <span className="ml-1.5 px-1 rounded bg-emerald-500/10 text-emerald-500">
+                                      por {r.unitOfMeasure}
+                                    </span>
+                                  )}
+                                </p>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="text-right px-3 py-2.5 tabular-nums">
+                            {r.wonDeals}
+                            {r.lostDeals > 0 && (
+                              <span className="text-rose-400 text-[10.5px]"> /{r.lostDeals}↓</span>
+                            )}
+                          </td>
+                          <td className="text-right px-3 py-2.5 tabular-nums font-semibold">
+                            {formatCompact(r.revenueCents)}
+                          </td>
+                          <td className={`text-right px-3 py-2.5 tabular-nums ${r.profitCents < 0 ? "text-red-500 font-semibold" : ""}`}>
+                            {formatCompact(r.profitCents)}
+                          </td>
+                          <td className="text-right px-3 py-2.5 tabular-nums">
+                            {r.revenueCents > 0 ? (
+                              <span className={
+                                mDx.tone === "ok" ? "text-emerald-500 font-semibold" :
+                                mDx.tone === "warn" ? "text-amber-500" : "text-red-500 font-semibold"
+                              }>
+                                {r.marginPercent}%
+                              </span>
+                            ) : <span className="text-muted-foreground">—</span>}
+                          </td>
+                          <td className="text-right px-3 py-2.5 tabular-nums text-muted-foreground">
+                            {formatNumber(r.unitsSold)} {r.unitOfMeasure || "un"}
+                          </td>
+                          <td className="text-right px-3 py-2.5 tabular-nums">
+                            {(r.wonDeals + r.lostDeals) > 0 ? (
+                              <span className={
+                                cDx.tone === "ok" ? "text-emerald-500" :
+                                cDx.tone === "warn" ? "text-amber-500" : "text-red-500"
+                              }>
+                                {r.conversionRate}%
+                              </span>
+                            ) : <span className="text-muted-foreground">—</span>}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Recomendações */}
+          {recommendations.length > 0 && (
+            <Card className="border-border/50">
+              <CardHeader>
+                <CardTitle className="text-[15px] flex items-center gap-2">
+                  <AlertTriangle className="h-4 w-4 text-amber-500" />
+                  Próximas ações
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <ul className="space-y-2.5">
+                  {recommendations.map((r, i) => (
+                    <li key={i} className="flex items-start gap-2 text-[13px] leading-relaxed">
+                      <span className="text-emerald-500 mt-0.5">→</span>
+                      <span dangerouslySetInnerHTML={{ __html: r.replace(/\*\*(.+?)\*\*/g, '<strong class="text-foreground">$1</strong>') }} />
+                    </li>
+                  ))}
+                </ul>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Footer button — link para catálogo */}
+          <div className="flex justify-center pt-2">
+            <Button variant="outline" onClick={() => navigate("/products")}>
+              <Award className="h-4 w-4 mr-1" />
+              Gerenciar catálogo de produtos
+            </Button>
           </div>
         </>
       )}

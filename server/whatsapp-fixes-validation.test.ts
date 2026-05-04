@@ -491,6 +491,66 @@ describe("[Orçamentos] Integração Produtos × Propostas + Aceitar/Rejeitar", 
   });
 });
 
+describe("[Analytics] Dashboard comercial de produtos (gestor sênior)", () => {
+  const crmDb = read("server/crmDb.ts");
+  const router = read("server/routers/productCatalogRouter.ts");
+  const reports = read("client/src/pages/ProductReports.tsx");
+
+  it("Backend: getProductCommercialSummary calcula receita/custo/lucro/margem com filtro de data", () => {
+    expect(crmDb).toMatch(/export async function getProductCommercialSummary/);
+    expect(crmDb).toMatch(/totalRevenueCents:\s*revenue/);
+    expect(crmDb).toMatch(/totalProfitCents:\s*profit/);
+    expect(crmDb).toMatch(/marginPercent:\s*margin/);
+    // Custo por modo (per_unit usa quantityPerUnit × costPerUnitCents)
+    expect(crmDb).toMatch(/CASE\s*WHEN dp\."pricingMode" = 'per_unit'\s*THEN COALESCE\(pc\."costPerUnitCents"/);
+    // Filtro de data por deals.createdAt — gerado pela helper dateConds
+    expect(crmDb).toMatch(/function dateConds\(prefix: string, f: ProductAnalyticsFilters\)/);
+    expect(crmDb).toMatch(/\$\{prefix\}\."createdAt" >=/);
+  });
+
+  it("Backend: getProductCommercialRanking expõe lucro, margem e conversão por produto", () => {
+    expect(crmDb).toMatch(/export async function getProductCommercialRanking/);
+    expect(crmDb).toMatch(/profitCents:\s*profit/);
+    expect(crmDb).toMatch(/marginPercent:\s*margin/);
+    expect(crmDb).toMatch(/conversionRate:\s*conversion/);
+    // Conta won + lost separadamente
+    expect(crmDb).toMatch(/wonDeals.*?d\.status\s*=\s*'won'/s);
+    expect(crmDb).toMatch(/lostDeals.*?d\.status\s*=\s*'lost'/s);
+  });
+
+  it("Router: expõe analytics.commercialSummary e analytics.commercialRanking", () => {
+    expect(router).toMatch(/commercialSummary:\s*tenantProcedure/);
+    expect(router).toMatch(/commercialRanking:\s*tenantProcedure/);
+    expect(router).toMatch(/getProductCommercialSummary/);
+    expect(router).toMatch(/getProductCommercialRanking/);
+  });
+
+  it("Frontend: ProductReports consome novos endpoints e renderiza KPIs sêniors", () => {
+    expect(reports).toMatch(/trpc\.productCatalog\.analytics\.commercialSummary\.useQuery/);
+    expect(reports).toMatch(/trpc\.productCatalog\.analytics\.commercialRanking\.useQuery/);
+    // 4 KPI cards principais
+    expect(reports).toMatch(/Receita/);
+    expect(reports).toMatch(/Lucro bruto/);
+    expect(reports).toMatch(/Margem média/);
+    expect(reports).toMatch(/Ticket médio/);
+    // 4 mini rankings
+    expect(reports).toMatch(/Top receita/);
+    expect(reports).toMatch(/Top lucro absoluto/);
+    expect(reports).toMatch(/Top volume/);
+    expect(reports).toMatch(/Top margem %/);
+    // Diagnóstico narrativo + Próximas ações
+    expect(reports).toMatch(/Diagnóstico do gestor/);
+    expect(reports).toMatch(/Próximas ações/);
+    // Tabela master
+    expect(reports).toMatch(/An[áa]lise por produto/);
+  });
+
+  it("Frontend: diagnóstico identifica produtos sem custo cadastrado", () => {
+    expect(reports).toMatch(/sem custo cadastrado/);
+    expect(reports).toMatch(/abaixo do custo/);
+  });
+});
+
 describe("[Pipeline] Card mostra produto acima do valor", () => {
   const crmDb = read("server/crmDb.ts");
   const pipeline = read("client/src/pages/Pipeline.tsx");

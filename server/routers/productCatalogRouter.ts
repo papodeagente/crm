@@ -212,5 +212,36 @@ const tenantId = getTenantId(ctx); const { id, ...data } = input;
       .query(async ({ input, ctx }) => {
         return crm.getProductAnalyticsTopLocations(getTenantId(ctx), input.limit);
       }),
+
+    // ─── Visão de gestor sênior comercial ───
+    /** Sumário comercial: receita / lucro / margem / ticket — base do dashboard. */
+    commercialSummary: tenantProcedure
+      .input(z.object({
+        dateFrom: z.string().optional(),
+        dateTo: z.string().optional(),
+      }).optional())
+      .query(async ({ input, ctx }) => {
+        return crm.getProductCommercialSummary({
+          tenantId: getTenantId(ctx),
+          dateFrom: input?.dateFrom,
+          dateTo: input?.dateTo,
+        });
+      }),
+
+    /** Ranking master: cada produto com receita, lucro, margem%, conversão. */
+    commercialRanking: tenantProcedure
+      .input(z.object({
+        dateFrom: z.string().optional(),
+        dateTo: z.string().optional(),
+        limit: z.number().min(1).max(200).default(50),
+      }).optional())
+      .query(async ({ input, ctx }) => {
+        return crm.getProductCommercialRanking({
+          tenantId: getTenantId(ctx),
+          dateFrom: input?.dateFrom,
+          dateTo: input?.dateTo,
+          limit: input?.limit,
+        });
+      }),
   }),
 });
