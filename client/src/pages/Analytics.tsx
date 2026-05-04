@@ -61,7 +61,15 @@ function formatDayLabel(period: string): string {
 }
 
 /* ─── Sub-pages for navigation ─── */
-const REPORT_PAGES = [
+// requiresPipelineType: o card só aparece se houver pipeline desse tipo no
+// tenant. Evita mostrar Pós-Venda/Suporte vazios em tenants que não usam.
+const REPORT_PAGES: Array<{
+  label: string;
+  path: string;
+  icon: any;
+  description: string;
+  requiresPipelineType?: "sales" | "post_sale" | "support";
+}> = [
   { label: "CRM Live", path: "/analytics/crm-live", icon: Activity, description: "Visão em tempo real da operação comercial" },
   { label: "Metas", path: "/analytics/goals", icon: Target, description: "Acompanhamento de metas com análise IA" },
   { label: "Produtos", path: "/analytics/products", icon: Package, description: "Análise de produtos vendidos" },
@@ -69,8 +77,8 @@ const REPORT_PAGES = [
   { label: "Agenda × Vendas", path: "/analytics/appointments", icon: CalendarCheck, description: "Comparecimento, no-show e conversão em vendas" },
   { label: "Orçamentos", path: "/analytics/proposals", icon: FileText, description: "Taxa de aceite, ciclo de fechamento e ranking comercial" },
   { label: "Fontes e Campanhas", path: "/analytics/sources-campaigns", icon: Megaphone, description: "Análise de origem por fonte, campanha e UTMs" },
-  { label: "Relatório de Pós-Venda", path: "/analytics/post-sale", icon: Plane, description: "Análise operacional da carteira em entrega" },
-  { label: "Relatório de Suporte", path: "/analytics/support", icon: LifeBuoy, description: "Análise operacional de casos e tratativas" },
+  { label: "Relatório de Pós-Venda", path: "/analytics/post-sale", icon: Plane, description: "Análise operacional da carteira em entrega", requiresPipelineType: "post_sale" },
+  { label: "Relatório de Suporte", path: "/analytics/support", icon: LifeBuoy, description: "Análise operacional de casos e tratativas", requiresPipelineType: "support" },
 ];
 
 /* ─── Main Component ─── */
@@ -90,6 +98,18 @@ export default function Analytics() {
     (pipelinesQ.data ?? []).filter(p => p.pipelineType === "sales"),
     [pipelinesQ.data]
   );
+  // Tipos de pipeline existentes neste tenant — usado para esconder cards
+  // de relatórios que dependem de pipelines vazias (ex.: Suporte sem dados).
+  const pipelineTypesPresent = useMemo(() => {
+    const set = new Set<string>();
+    for (const p of (pipelinesQ.data ?? [])) {
+      if (p.pipelineType) set.add(p.pipelineType);
+    }
+    return set;
+  }, [pipelinesQ.data]);
+  const visibleReportPages = useMemo(() => {
+    return REPORT_PAGES.filter(p => !p.requiresPipelineType || pipelineTypesPresent.has(p.requiresPipelineType));
+  }, [pipelineTypesPresent]);
   const usersQ = trpc.admin.users.list.useQuery();
 
   const filterInput = useMemo(() => ({
@@ -815,7 +835,7 @@ export default function Analytics() {
             Outros Relatórios
           </h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {REPORT_PAGES.map(page => (
+            {visibleReportPages.map(page => (
               <Card
                 key={page.path}
                 className="border-border/50 hover:border-primary/30 hover:shadow-md transition-all duration-200 cursor-pointer group"

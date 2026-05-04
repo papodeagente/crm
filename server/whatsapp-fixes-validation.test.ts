@@ -535,6 +535,17 @@ describe("[Analytics] Reforma — fixes + propostas analytics", () => {
     expect(hub).toMatch(/Or[çc]amentos/);
   });
 
+  it("Hub esconde cards de relatórios cujos pipelines não existem no tenant", () => {
+    // REPORT_PAGES tem requiresPipelineType nos cards Pós-Venda e Suporte
+    expect(hub).toMatch(/requiresPipelineType:\s*"post_sale"/);
+    expect(hub).toMatch(/requiresPipelineType:\s*"support"/);
+    // Filtro com base nos tipos presentes
+    expect(hub).toMatch(/pipelineTypesPresent/);
+    expect(hub).toMatch(/visibleReportPages/);
+    // Render itera sobre visibleReportPages (não REPORT_PAGES direto)
+    expect(hub).toMatch(/\{visibleReportPages\.map\(page =>/);
+  });
+
   it("App.tsx registra rota /analytics/proposals", () => {
     expect(app).toMatch(/Route path="\/analytics\/proposals"/);
   });
