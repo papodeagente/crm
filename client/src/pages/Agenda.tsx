@@ -254,11 +254,27 @@ export default function Agenda() {
     return `${s.getDate()} ${MONTHS_PT[s.getMonth()].slice(0, 3)} — ${e.getDate()} ${MONTHS_PT[e.getMonth()].slice(0, 3)}`;
   }
 
-  // Get appointments for a specific day
+  // Get TIMED appointments for a specific day (allDay rendered separately)
   function getApptsForDay(day: Date) {
     return appointments.filter((a: any) => {
+      if (a.allDay) return false;
       const start = new Date(a.startAt);
       return isSameDay(start, day);
+    });
+  }
+
+  // Get all-day appointments for a specific day. Inclui itens cuja janela
+  // [startAt, endAt] cobre o dia (deal_appointment / deal_followup vêm com
+  // startAt 00:00 e endAt 23:59 do mesmo dia, mas Google Calendar all-day
+  // pode atravessar múltiplos dias).
+  function getAllDayApptsForDay(day: Date) {
+    const dayStart = new Date(day); dayStart.setHours(0, 0, 0, 0);
+    const dayEnd = new Date(day); dayEnd.setHours(23, 59, 59, 999);
+    return appointments.filter((a: any) => {
+      if (!a.allDay) return false;
+      const s = new Date(a.startAt).getTime();
+      const e = new Date(a.endAt || a.startAt).getTime();
+      return s <= dayEnd.getTime() && e >= dayStart.getTime();
     });
   }
 
@@ -340,6 +356,36 @@ export default function Agenda() {
                   <p className={`text-lg font-semibold ${isToday ? "text-[#2E7D5B]" : "text-foreground"}`}>
                     {day.getDate()}
                   </p>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* All-day row: aparece entre header e grade horária. Mostra
+              appointments com allDay=true (incluindo Datas do Serviço da
+              negociação, sincronizadas via syncDealServiceDates). */}
+          <div className="flex border-b bg-muted/10 sticky top-[60px] z-10">
+            <div className="w-16 shrink-0 border-r flex items-center justify-end pr-1.5">
+              <span className="text-[9px] uppercase tracking-wider text-muted-foreground">Dia inteiro</span>
+            </div>
+            {(viewMode === "week" ? weekDays : [baseDate]).map((day, i) => {
+              const allDayItems = getAllDayApptsForDay(day);
+              return (
+                <div key={i} className="flex-1 border-r last:border-r-0 px-1 py-1 min-h-[28px] space-y-0.5">
+                  {allDayItems.map((appt: any) => {
+                    const status = appt.status || "scheduled";
+                    const colorClass = STATUS_COLORS[status] || STATUS_COLORS.scheduled;
+                    return (
+                      <div
+                        key={appt.id}
+                        className={`rounded px-1.5 py-0.5 text-[10.5px] font-medium text-white border-l-[3px] cursor-pointer truncate hover:brightness-110 transition ${colorClass}`}
+                        onClick={(e) => { e.stopPropagation(); setDetailAppt(appt); }}
+                        title={appt.title}
+                      >
+                        {appt.title}
+                      </div>
+                    );
+                  })}
                 </div>
               );
             })}
