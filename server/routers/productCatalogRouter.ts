@@ -97,6 +97,8 @@ const tenantId = getTenantId(ctx); const { id, ...data } = input;
         pricingMode: z.enum(["fixed", "per_unit"]).optional(),
         unitOfMeasure: z.string().max(32).nullable().optional(),
         pricePerUnitCents: z.number().nullable().optional(),
+        costPerUnitCents: z.number().nullable().optional(),
+        defaultQuantityPerUnit: z.number().positive().nullable().optional(),
       }))
       .mutation(async ({ input, ctx }) => {
         const { categoryId, costPriceCents, ...rest } = input;

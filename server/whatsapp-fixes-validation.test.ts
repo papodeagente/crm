@@ -573,6 +573,37 @@ describe("[Produtos] Precificação por mL/g + foto no orçamento", () => {
     expect(productCatalog).toMatch(/Foto do produto/);
   });
 
+  it("Front: ProductCatalog form tem custo/un + quantidade default + cálculo de margem", () => {
+    expect(productCatalog).toMatch(/costPerUnitCents:/);
+    expect(productCatalog).toMatch(/defaultQuantityPerUnit:/);
+    // UI inputs
+    expect(productCatalog).toMatch(/Custo por \{form\.unitOfMeasure/);
+    expect(productCatalog).toMatch(/Venda por \{form\.unitOfMeasure/);
+    expect(productCatalog).toMatch(/Quantidade padrão por serviço/);
+    // Margem por mL exibida
+    expect(productCatalog).toMatch(/Margem por \{form\.unitOfMeasure/);
+  });
+
+  it("Front: ProductCatalog removeu o bloco 'Campos adicionais'", () => {
+    expect(productCatalog).not.toMatch(/Campos adicionais/);
+    // Os campos individuais não aparecem mais (só permanece o toggle Ativo).
+    const editingChunk = productCatalog.match(/\{isEditing && \([\s\S]*?\)\}\s*<\/div>\s*<DialogFooter/)?.[0] || "";
+    expect(editingChunk).not.toMatch(/SKU \/ Código/);
+    expect(editingChunk).not.toMatch(/durationMinutes/);
+  });
+
+  it("Backend: createCatalogProduct aceita costPerUnitCents + defaultQuantityPerUnit", () => {
+    const crmDbFile = read("server/crmDb.ts");
+    expect(crmDbFile).toMatch(/costPerUnitCents\?:\s*number \| null/);
+    expect(crmDbFile).toMatch(/defaultQuantityPerUnit\?:\s*number \| null/);
+    expect(crmDbFile).toMatch(/insertData\.defaultQuantityPerUnit\s*=\s*String/);
+  });
+
+  it("Front: DealProductsDialog pré-preenche prompt com defaultQuantityPerUnit", () => {
+    const dlg = read("client/src/components/inbox/sidebar/DealProductsDialog.tsx");
+    expect(dlg).toMatch(/product\.defaultQuantityPerUnit/);
+  });
+
   it("Front: DealProductsDialog tem prompt inline de quantidade pra produtos per_unit", () => {
     expect(dialog).toMatch(/pendingPerUnit/);
     expect(dialog).toMatch(/product\.pricingMode === "per_unit"/);

@@ -721,8 +721,12 @@ export const productCatalog = pgTable("product_catalog", {
   pricingMode: varchar("pricingMode", { length: 16 }).default("fixed").notNull(),
   /** Unidade de medida quando pricingMode='per_unit' (ex.: "mL", "g", "h"). */
   unitOfMeasure: varchar("unitOfMeasure", { length: 32 }),
-  /** Preço por unidade em centavos (ex.: R$ 50/mL → 5000). */
+  /** Preço de venda por unidade em centavos (ex.: R$ 50/mL → 5000). */
   pricePerUnitCents: bigint("pricePerUnitCents", { mode: "number" }),
+  /** Custo por unidade em centavos (margem por mL/g). */
+  costPerUnitCents: bigint("costPerUnitCents", { mode: "number" }),
+  /** Quantidade padrão (mL/g) sugerida quando o produto entra no orçamento. */
+  defaultQuantityPerUnit: numeric("defaultQuantityPerUnit", { precision: 10, scale: 3 }),
   detailsJson: json("detailsJson"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),

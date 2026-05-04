@@ -193,6 +193,8 @@ function ProductFormDialog({
     pricingMode: ((product as any)?.pricingMode || "fixed") as "fixed" | "per_unit",
     unitOfMeasure: (product as any)?.unitOfMeasure || "mL",
     pricePerUnitCents: (product as any)?.pricePerUnitCents != null ? String((product as any).pricePerUnitCents / 100) : "",
+    costPerUnitCents: (product as any)?.costPerUnitCents != null ? String((product as any).costPerUnitCents / 100) : "",
+    defaultQuantityPerUnit: (product as any)?.defaultQuantityPerUnit != null ? String((product as any).defaultQuantityPerUnit) : "",
     // Foto do produto (aparece no orçamento que vai pro cliente)
     imageUrl: (product as any)?.imageUrl || "",
   });
@@ -261,6 +263,12 @@ function ProductFormDialog({
       unitOfMeasure: form.pricingMode === "per_unit" ? (form.unitOfMeasure || "mL") : null,
       pricePerUnitCents: form.pricingMode === "per_unit" && form.pricePerUnitCents
         ? Math.round(Number(form.pricePerUnitCents) * 100)
+        : null,
+      costPerUnitCents: form.pricingMode === "per_unit" && form.costPerUnitCents
+        ? Math.round(Number(form.costPerUnitCents) * 100)
+        : null,
+      defaultQuantityPerUnit: form.pricingMode === "per_unit" && form.defaultQuantityPerUnit
+        ? Number(form.defaultQuantityPerUnit)
         : null,
       imageUrl: form.imageUrl || null,
     };
@@ -420,32 +428,72 @@ function ProductFormDialog({
               </button>
             </div>
             {form.pricingMode === "per_unit" && (
-              <div className="grid grid-cols-2 gap-2 pt-1">
-                <div>
-                  <Label className="text-[11px]">Unidade</Label>
-                  <Select value={form.unitOfMeasure || "mL"} onValueChange={(v) => setForm({ ...form, unitOfMeasure: v })}>
-                    <SelectTrigger className="h-9 text-[13px]"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="mL">mL (mililitro)</SelectItem>
-                      <SelectItem value="g">g (grama)</SelectItem>
-                      <SelectItem value="UI">UI (unidade internacional)</SelectItem>
-                      <SelectItem value="sessão">sessão</SelectItem>
-                      <SelectItem value="h">h (hora)</SelectItem>
-                    </SelectContent>
-                  </Select>
+              <div className="space-y-2 pt-1">
+                <div className="grid grid-cols-3 gap-2">
+                  <div>
+                    <Label className="text-[11px]">Unidade</Label>
+                    <Select value={form.unitOfMeasure || "mL"} onValueChange={(v) => setForm({ ...form, unitOfMeasure: v })}>
+                      <SelectTrigger className="h-9 text-[13px]"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="mL">mL (mililitro)</SelectItem>
+                        <SelectItem value="g">g (grama)</SelectItem>
+                        <SelectItem value="UI">UI (unidade internacional)</SelectItem>
+                        <SelectItem value="sessão">sessão</SelectItem>
+                        <SelectItem value="h">h (hora)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label className="text-[11px]">Custo por {form.unitOfMeasure || "un"}</Label>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={form.costPerUnitCents}
+                      onChange={(e) => setForm({ ...form, costPerUnitCents: e.target.value })}
+                      placeholder="R$ 0,00"
+                      className="h-9"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-[11px]">Venda por {form.unitOfMeasure || "un"} *</Label>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={form.pricePerUnitCents}
+                      onChange={(e) => setForm({ ...form, pricePerUnitCents: e.target.value })}
+                      placeholder="R$ 0,00"
+                      className="h-9"
+                    />
+                  </div>
                 </div>
                 <div>
-                  <Label className="text-[11px]">Preço por {form.unitOfMeasure || "unidade"} *</Label>
+                  <Label className="text-[11px]">Quantidade padrão por serviço ({form.unitOfMeasure || "un"})</Label>
                   <Input
                     type="number"
                     step="0.01"
                     min="0"
-                    value={form.pricePerUnitCents}
-                    onChange={(e) => setForm({ ...form, pricePerUnitCents: e.target.value })}
-                    placeholder="R$ 0,00"
-                    className="h-9"
+                    value={form.defaultQuantityPerUnit}
+                    onChange={(e) => setForm({ ...form, defaultQuantityPerUnit: e.target.value })}
+                    placeholder="Ex.: 1, 0.5, 2"
+                    className="h-9 max-w-[180px]"
                   />
+                  <p className="text-[10px] text-muted-foreground mt-1">
+                    Sugestão automática ao adicionar este produto a um orçamento (pode ser ajustada por consulta).
+                  </p>
                 </div>
+                {(() => {
+                  const c = Number(form.costPerUnitCents || 0);
+                  const v = Number(form.pricePerUnitCents || 0);
+                  if (c <= 0 || v <= 0) return null;
+                  const margin = ((v - c) / c) * 100;
+                  return (
+                    <div className={`text-[11px] px-2 py-1 rounded-md ${margin >= 0 ? "bg-emerald-500/10 text-emerald-600" : "bg-red-500/10 text-red-500"}`}>
+                      Margem por {form.unitOfMeasure || "un"}: {margin >= 0 ? "+" : ""}{margin.toFixed(1)}% (lucro de R$ {(v - c).toFixed(2)} por {form.unitOfMeasure || "un"})
+                    </div>
+                  );
+                })()}
               </div>
             )}
           </div>
@@ -517,64 +565,16 @@ function ProductFormDialog({
               )}
             </div>
           )}
-          {/* Fornecedor (mantido em modo edit) */}
+          {/* Toggle de ativação (modo edit) — produtos inativos somem do dropdown
+              de seleção em orçamentos. Único campo administrativo mantido. */}
           {isEditing && (
-            <div>
-              <Label>Fornecedor</Label>
-              <Input value={form.supplier} onChange={(e) => setForm({ ...form, supplier: e.target.value })} placeholder="Nome do fornecedor (opcional)" />
+            <div className="flex items-center justify-between px-3 py-2 rounded-lg bg-muted/50">
+              <div>
+                <p className="text-sm font-medium text-foreground">Produto Ativo</p>
+                <p className="text-xs text-muted-foreground">Inativos não aparecem na seleção do orçamento</p>
+              </div>
+              <Switch checked={form.isActive} onCheckedChange={(v) => setForm({ ...form, isActive: v })} />
             </div>
-          )}
-          {/* Additional fields only in edit mode */}
-          {isEditing && (
-            <>
-              <div className="border-t border-border pt-3">
-                <p className="text-xs text-muted-foreground mb-3">Campos adicionais</p>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <Label>Tipo</Label>
-                    <Select value={form.productType} onValueChange={(v) => setForm({ ...form, productType: v })}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        {Object.entries(PRODUCT_TYPES).map(([key, { label }]) => (
-                          <SelectItem key={key} value={key}>{label}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div>
-                    <Label>Categoria</Label>
-                    <Select value={form.categoryId} onValueChange={(v) => setForm({ ...form, categoryId: v })}>
-                      <SelectTrigger><SelectValue placeholder="Selecionar..." /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="none">Sem categoria</SelectItem>
-                        {categories.map((cat) => (
-                          <SelectItem key={cat.id} value={String(cat.id)}>{cat.name}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div>
-                    <Label>Local</Label>
-                    <Input value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })} placeholder="Ex: Unidade Centro" />
-                  </div>
-                  <div>
-                    <Label>Duração</Label>
-                    <Input value={form.durationMinutes} onChange={(e) => setForm({ ...form, durationMinutes: e.target.value })} placeholder="Ex: 30 minutos" />
-                  </div>
-                  <div>
-                    <Label>SKU / Código</Label>
-                    <Input value={form.sku} onChange={(e) => setForm({ ...form, sku: e.target.value })} placeholder="Ex: PKG-PAR-001" />
-                  </div>
-                </div>
-              </div>
-              <div className="flex items-center justify-between px-3 py-2 rounded-lg bg-muted/50">
-                <div>
-                  <p className="text-sm font-medium text-foreground">Produto Ativo</p>
-                  <p className="text-xs text-muted-foreground">Produtos inativos não aparecem na seleção</p>
-                </div>
-                <Switch checked={form.isActive} onCheckedChange={(v) => setForm({ ...form, isActive: v })} />
-              </div>
-            </>
           )}
         </div>
         <DialogFooter>

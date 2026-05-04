@@ -1766,9 +1766,16 @@ export async function createCatalogProduct(data: {
   pricingMode?: "fixed" | "per_unit";
   unitOfMeasure?: string | null;
   pricePerUnitCents?: number | null;
+  costPerUnitCents?: number | null;
+  defaultQuantityPerUnit?: number | null;
 }) {
   const db = await getDb(); if (!db) return null;
-  const [result] = await db.insert(productCatalog).values(data as any).returning({ id: productCatalog.id });
+  const insertData: any = { ...data };
+  // numeric column expects string para decimal
+  if (insertData.defaultQuantityPerUnit !== undefined && insertData.defaultQuantityPerUnit !== null) {
+    insertData.defaultQuantityPerUnit = String(insertData.defaultQuantityPerUnit);
+  }
+  const [result] = await db.insert(productCatalog).values(insertData).returning({ id: productCatalog.id });
   return result;
 }
 export async function updateCatalogProduct(tenantId: number, id: number, data: Partial<{
@@ -1782,9 +1789,15 @@ export async function updateCatalogProduct(tenantId: number, id: number, data: P
   pricingMode: "fixed" | "per_unit";
   unitOfMeasure: string | null;
   pricePerUnitCents: number | null;
+  costPerUnitCents: number | null;
+  defaultQuantityPerUnit: number | null;
 }>) {
   const db = await getDb(); if (!db) return;
-  await db.update(productCatalog).set(data as any).where(and(eq(productCatalog.id, id), eq(productCatalog.tenantId, tenantId)));
+  const patch: any = { ...data };
+  if (patch.defaultQuantityPerUnit !== undefined && patch.defaultQuantityPerUnit !== null) {
+    patch.defaultQuantityPerUnit = String(patch.defaultQuantityPerUnit);
+  }
+  await db.update(productCatalog).set(patch).where(and(eq(productCatalog.id, id), eq(productCatalog.tenantId, tenantId)));
 }
 export async function deleteCatalogProduct(tenantId: number, id: number) {
   const db = await getDb(); if (!db) return;

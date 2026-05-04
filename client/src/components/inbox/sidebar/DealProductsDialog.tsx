@@ -71,8 +71,12 @@ export default function DealProductsDialog({ open, onClose, dealId }: DealProduc
 
   const addProduct = (product: any) => {
     if (product.pricingMode === "per_unit") {
-      // Abre o prompt para informar quantos mL/g aplicar.
-      setPendingPerUnit({ product, qtyStr: "1" });
+      // Abre o prompt para informar quantos mL/g aplicar — pré-preenche
+      // com a quantidade padrão configurada no produto (se houver).
+      const defaultQty = product.defaultQuantityPerUnit
+        ? String(Number(product.defaultQuantityPerUnit))
+        : "1";
+      setPendingPerUnit({ product, qtyStr: defaultQty });
       return;
     }
     addMut.mutate({ dealId, productId: product.id, quantity: 1 });
