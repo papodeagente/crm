@@ -14,7 +14,7 @@ import {
   BarChart3, TrendingUp, TrendingDown, DollarSign, Target,
   Trophy, XCircle, Clock, Briefcase, Filter,
   ChevronRight, Loader2, AlertTriangle, Package, Users as UsersIcon, Activity, Megaphone,
-  Plane, LifeBuoy, Crown, Globe, Sparkles, AlertCircle, CalendarCheck,
+  Plane, LifeBuoy, Crown, Globe, Sparkles, AlertCircle, CalendarCheck, FileText,
 } from "lucide-react";
 import DateRangeFilter, { useDateFilter } from "@/components/DateRangeFilter";
 import {
@@ -67,6 +67,7 @@ const REPORT_PAGES = [
   { label: "Produtos", path: "/analytics/products", icon: Package, description: "Análise de produtos vendidos" },
   { label: "Insights WhatsApp", path: "/insights", icon: BarChart3, description: "Métricas de mensagens e atendimento" },
   { label: "Agenda × Vendas", path: "/analytics/appointments", icon: CalendarCheck, description: "Comparecimento, no-show e conversão em vendas" },
+  { label: "Orçamentos", path: "/analytics/proposals", icon: FileText, description: "Taxa de aceite, ciclo de fechamento e ranking comercial" },
   { label: "Fontes e Campanhas", path: "/analytics/sources-campaigns", icon: Megaphone, description: "Análise de origem por fonte, campanha e UTMs" },
   { label: "Relatório de Pós-Venda", path: "/analytics/post-sale", icon: Plane, description: "Análise operacional da carteira em entrega" },
   { label: "Relatório de Suporte", path: "/analytics/support", icon: LifeBuoy, description: "Análise operacional de casos e tratativas" },

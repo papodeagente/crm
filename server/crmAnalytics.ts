@@ -248,7 +248,9 @@ export async function getDealsByPeriod(f: AnalyticsFilters): Promise<DealsByPeri
 
   const where = buildConditions(f);
 
-  const periodExpr = sql<string>`DATE_FORMAT(${deals.createdAt}, '%Y-%m-%d')`.as('period');
+  // PostgreSQL: TO_CHAR para formatar data (DATE_FORMAT é MySQL).
+  // Bug histórico: usava DATE_FORMAT que não existe em PG → query 500.
+  const periodExpr = sql<string>`TO_CHAR(${deals.createdAt}, 'YYYY-MM-DD')`.as('period');
   let q = db.select({
     period: periodExpr,
     status: deals.status,
@@ -593,6 +595,161 @@ export async function getStagnation(f: AnalyticsFilters, thresholdDays = 14, lis
       ownerName: r.ownerName || null,
       daysSinceActivity: Math.floor(Number(r.daysSinceActivity || 0)),
     })),
+  };
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   PROPOSTAS — Taxa de aceite, ciclo, valor e ranking comercial
+   ═══════════════════════════════════════════════════════════════════════
+   Mede a saúde do funil de fechamento: quanto vai pra cliente como
+   proposta visual (sent), quanto volta como aceite, quanto é rejeitado,
+   tempo médio entre envio e decisão. Útil pra identificar gargalos de
+   fechamento e quem tem melhor abordagem comercial.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+export interface ProposalsAnalyticsResult {
+  totalProposals: number;
+  draft: number;
+  sent: number;
+  viewed: number;
+  accepted: number;
+  rejected: number;
+  expired: number;
+
+  // Funil:
+  acceptanceRate: number;     // accepted / (accepted + rejected) — taxa real
+  rejectionRate: number;      // rejected / (accepted + rejected)
+  pendingRate: number;        // (sent+viewed) / total — esperando resposta
+
+  // Valores (centavos):
+  totalValueSent: number;     // sent + viewed + accepted + rejected
+  acceptedValueCents: number;
+  rejectedValueCents: number;
+  pendingValueCents: number;  // sent + viewed
+  avgAcceptedTicket: number;
+
+  // Ciclo:
+  avgDaysToAccept: number;    // sentAt → acceptedAt
+
+  // Por agente
+  byOwner: Array<{
+    ownerUserId: number | null;
+    ownerName: string | null;
+    sent: number;
+    accepted: number;
+    rejected: number;
+    acceptanceRate: number;
+    acceptedValueCents: number;
+  }>;
+}
+
+export async function getProposalsAnalytics(f: AnalyticsFilters): Promise<ProposalsAnalyticsResult> {
+  const empty: ProposalsAnalyticsResult = {
+    totalProposals: 0, draft: 0, sent: 0, viewed: 0, accepted: 0, rejected: 0, expired: 0,
+    acceptanceRate: 0, rejectionRate: 0, pendingRate: 0,
+    totalValueSent: 0, acceptedValueCents: 0, rejectedValueCents: 0, pendingValueCents: 0,
+    avgAcceptedTicket: 0, avgDaysToAccept: 0, byOwner: [],
+  };
+  const db = await getDb();
+  if (!db) return empty;
+  const tenantId = safeInt(f.tenantId);
+  if (!tenantId) return empty;
+
+  // Filtro de data: usa createdAt da proposta (quando foi gerada).
+  const dCond = [
+    f.dateFrom ? `AND p."createdAt" >= '${safeDate(f.dateFrom)} 00:00:00'` : "",
+    f.dateTo ? `AND p."createdAt" <= '${safeDate(f.dateTo)} 23:59:59'` : "",
+  ].filter(Boolean).join(" ");
+
+  // Agregada por status. Não exclui propostas de deals deletadas — ato
+  // comercial registrado tem valor histórico.
+  const result = rowsOf(await db.execute(sql.raw(`
+    SELECT
+      p.status::text AS status,
+      COUNT(*)::int AS cnt,
+      COALESCE(SUM(p."totalCents"), 0)::bigint AS total_value,
+      COALESCE(AVG(EXTRACT(EPOCH FROM (p."acceptedAt" - p."sentAt")) / 86400.0)
+        FILTER (WHERE p.status = 'accepted' AND p."acceptedAt" IS NOT NULL AND p."sentAt" IS NOT NULL), 0)::float AS avg_days_to_accept
+    FROM proposals p
+    WHERE p."tenantId" = ${tenantId}
+      ${dCond}
+    GROUP BY p.status
+  `)));
+
+  let total = 0, draft = 0, sent = 0, viewed = 0, accepted = 0, rejected = 0, expired = 0;
+  let acceptedValueCents = 0, rejectedValueCents = 0, sentValueCents = 0, viewedValueCents = 0;
+  let weightedDays = 0;
+
+  for (const r of rowsOf(result) as any[]) {
+    const cnt = Number(r.cnt) || 0;
+    const tval = Number(r.total_value) || 0;
+    total += cnt;
+    if (r.status === "draft") draft = cnt;
+    else if (r.status === "sent") { sent = cnt; sentValueCents = tval; }
+    else if (r.status === "viewed") { viewed = cnt; viewedValueCents = tval; }
+    else if (r.status === "accepted") {
+      accepted = cnt;
+      acceptedValueCents = tval;
+      weightedDays = Number(r.avg_days_to_accept || 0) * cnt;
+    }
+    else if (r.status === "rejected") { rejected = cnt; rejectedValueCents = tval; }
+    else if (r.status === "expired") expired = cnt;
+  }
+
+  const decided = accepted + rejected;
+  const acceptanceRate = decided > 0 ? Math.round((accepted / decided) * 1000) / 10 : 0;
+  const rejectionRate = decided > 0 ? Math.round((rejected / decided) * 1000) / 10 : 0;
+  const pending = sent + viewed;
+  const pendingRate = total > 0 ? Math.round((pending / total) * 1000) / 10 : 0;
+  const avgAcceptedTicket = accepted > 0 ? Math.round(acceptedValueCents / accepted) : 0;
+  const avgDaysToAccept = accepted > 0 ? Math.round((weightedDays / accepted) * 10) / 10 : 0;
+
+  // Ranking por dono da deal (proxy do dono da proposta)
+  const ownerRows = rowsOf(await db.execute(sql.raw(`
+    SELECT
+      d."ownerUserId" AS "ownerUserId",
+      MIN(u.name) AS "ownerName",
+      COUNT(*) FILTER (WHERE p.status IN ('sent','viewed','accepted','rejected'))::int AS sent,
+      COUNT(*) FILTER (WHERE p.status = 'accepted')::int AS accepted,
+      COUNT(*) FILTER (WHERE p.status = 'rejected')::int AS rejected,
+      COALESCE(SUM(p."totalCents") FILTER (WHERE p.status = 'accepted'), 0)::bigint AS "acceptedValueCents"
+    FROM proposals p
+    INNER JOIN deals d ON d.id = p."dealId" AND d."tenantId" = p."tenantId"
+    LEFT JOIN crm_users u ON u.id = d."ownerUserId" AND u."tenantId" = p."tenantId"
+    WHERE p."tenantId" = ${tenantId}
+      AND d."ownerUserId" IS NOT NULL
+      ${dCond}
+    GROUP BY d."ownerUserId"
+    ORDER BY "acceptedValueCents" DESC, accepted DESC
+    LIMIT 20
+  `)));
+
+  const byOwner = ownerRows.map((r: any) => {
+    const accCnt = Number(r.accepted) || 0;
+    const rejCnt = Number(r.rejected) || 0;
+    const decidedOwner = accCnt + rejCnt;
+    return {
+      ownerUserId: r.ownerUserId ? Number(r.ownerUserId) : null,
+      ownerName: r.ownerName || null,
+      sent: Number(r.sent) || 0,
+      accepted: accCnt,
+      rejected: rejCnt,
+      acceptanceRate: decidedOwner > 0 ? Math.round((accCnt / decidedOwner) * 1000) / 10 : 0,
+      acceptedValueCents: Number(r.acceptedValueCents) || 0,
+    };
+  });
+
+  return {
+    totalProposals: total,
+    draft, sent, viewed, accepted, rejected, expired,
+    acceptanceRate, rejectionRate, pendingRate,
+    totalValueSent: sentValueCents + viewedValueCents + acceptedValueCents + rejectedValueCents,
+    acceptedValueCents,
+    rejectedValueCents,
+    pendingValueCents: sentValueCents + viewedValueCents,
+    avgAcceptedTicket,
+    avgDaysToAccept,
+    byOwner,
   };
 }
 

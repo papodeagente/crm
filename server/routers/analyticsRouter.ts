@@ -5,7 +5,7 @@
 import { z } from "zod";
 import { router } from "../_core/trpc";
 import { tenantProcedure, tenantWriteProcedure, getTenantId } from "../_core/trpc";
-import { getAnalyticsSummary, getTopLossReasons, getPipelineFunnel, getDealsByPeriod, getFunnelConversion, getSalesRanking, getLeadSources, getForecast, getStagnation, getAppointmentsAnalytics } from "../crmAnalytics";
+import { getAnalyticsSummary, getTopLossReasons, getPipelineFunnel, getDealsByPeriod, getFunnelConversion, getSalesRanking, getLeadSources, getForecast, getStagnation, getAppointmentsAnalytics, getProposalsAnalytics } from "../crmAnalytics";
 import { getGoalsReport, generateGoalsAIAnalysis } from "../goalsAnalytics";
 import { getCrmLiveCover, getCrmLiveOperation } from "../crmLive";
 
@@ -232,6 +232,23 @@ export const analyticsRouter = router({
     }).optional())
     .query(async ({ input, ctx }) => {
       return getAppointmentsAnalytics({
+        tenantId: getTenantId(ctx),
+        dateFrom: input?.dateFrom,
+        dateTo: input?.dateTo,
+      });
+    }),
+
+  /**
+   * Análise de Propostas. Mede taxa de aceite, tempo médio de fechamento
+   * e ranking de quem mais converte propostas em vendas.
+   */
+  proposals: tenantProcedure
+    .input(z.object({
+      dateFrom: z.string().optional(),
+      dateTo: z.string().optional(),
+    }).optional())
+    .query(async ({ input, ctx }) => {
+      return getProposalsAnalytics({
         tenantId: getTenantId(ctx),
         dateFrom: input?.dateFrom,
         dateTo: input?.dateTo,

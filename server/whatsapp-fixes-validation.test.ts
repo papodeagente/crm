@@ -491,6 +491,55 @@ describe("[Orçamentos] Integração Produtos × Propostas + Aceitar/Rejeitar", 
   });
 });
 
+describe("[Analytics] Reforma — fixes + propostas analytics", () => {
+  const crmAnalytics = read("server/crmAnalytics.ts");
+  const router = read("server/routers/analyticsRouter.ts");
+  const page = read("client/src/pages/ProposalsAnalytics.tsx");
+  const hub = read("client/src/pages/Analytics.tsx");
+  const app = read("client/src/App.tsx");
+
+  it("Bug fix: getDealsByPeriod usa TO_CHAR (PG) em vez de DATE_FORMAT (MySQL)", () => {
+    // Não pode haver chamada real a DATE_FORMAT (sql template). Comentário OK.
+    expect(crmAnalytics).toMatch(/TO_CHAR\(\$\{deals\.createdAt\}/);
+    expect(crmAnalytics).not.toMatch(/sql<string>`DATE_FORMAT/);
+  });
+
+  it("Backend: getProposalsAnalytics calcula taxa de aceite + ciclo + ranking", () => {
+    expect(crmAnalytics).toMatch(/export async function getProposalsAnalytics/);
+    // Object shorthand: `acceptanceRate,` (não acceptanceRate: acceptanceRate)
+    expect(crmAnalytics).toMatch(/acceptanceRate,\s/);
+    expect(crmAnalytics).toMatch(/avgDaysToAccept/);
+    expect(crmAnalytics).toMatch(/byOwner,/);
+    // Ciclo médio com EXTRACT EPOCH e divisão por 86400 (segundos→dias)
+    expect(crmAnalytics).toMatch(/EXTRACT\(EPOCH FROM \(p\."acceptedAt" - p\."sentAt"\)\) \/ 86400\.0/);
+  });
+
+  it("Router: expõe crmAnalytics.proposals", () => {
+    expect(router).toMatch(/proposals:\s*tenantProcedure/);
+    expect(router).toMatch(/getProposalsAnalytics/);
+  });
+
+  it("Frontend: ProposalsAnalytics consome procedure e renderiza KPIs sêniors", () => {
+    expect(page).toMatch(/trpc\.crmAnalytics\.proposals\.useQuery/);
+    expect(page).toMatch(/Taxa de aceite/);
+    expect(page).toMatch(/Receita confirmada/);
+    expect(page).toMatch(/Ciclo médio/);
+    expect(page).toMatch(/Funil de propostas/);
+    expect(page).toMatch(/Performance por agente/);
+    expect(page).toMatch(/Diagnóstico do gestor/);
+    expect(page).toMatch(/Próximas ações/);
+  });
+
+  it("Hub Analytics inclui card 'Orçamentos' apontando pra /analytics/proposals", () => {
+    expect(hub).toMatch(/path:\s*"\/analytics\/proposals"/);
+    expect(hub).toMatch(/Or[çc]amentos/);
+  });
+
+  it("App.tsx registra rota /analytics/proposals", () => {
+    expect(app).toMatch(/Route path="\/analytics\/proposals"/);
+  });
+});
+
 describe("[Analytics] Dashboard comercial de produtos (gestor sênior)", () => {
   const crmDb = read("server/crmDb.ts");
   const router = read("server/routers/productCatalogRouter.ts");
