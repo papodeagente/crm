@@ -2024,7 +2024,9 @@ export async function getProductCommercialSummary(f: ProductAnalyticsFilters): P
       ), 0)::float AS units,
       COUNT(DISTINCT dp."productId")::int AS distinct_products
     FROM deal_products dp
-    INNER JOIN deals d ON d.id = dp."dealId" AND d."tenantId" = dp."tenantId" AND d."deletedAt" IS NULL
+    -- Inclui deals soft-deletadas: receita ganha é histórico imutável.
+    -- Quem deletou a deal estava limpando UI, mas a venda aconteceu.
+    INNER JOIN deals d ON d.id = dp."dealId" AND d."tenantId" = dp."tenantId"
     LEFT JOIN product_catalog pc ON pc.id = dp."productId" AND pc."tenantId" = dp."tenantId"
     WHERE dp."tenantId" = ${tenantId}
       AND d.status = 'won'
@@ -2111,7 +2113,9 @@ export async function getProductCommercialRanking(f: ProductAnalyticsFilters & {
         ELSE 0 END
       ), 0)::bigint AS "costCents"
     FROM deal_products dp
-    INNER JOIN deals d ON d.id = dp."dealId" AND d."tenantId" = dp."tenantId" AND d."deletedAt" IS NULL
+    -- Inclui deals soft-deletadas: receita ganha é histórico imutável.
+    -- Quem deletou a deal estava limpando UI, mas a venda aconteceu.
+    INNER JOIN deals d ON d.id = dp."dealId" AND d."tenantId" = dp."tenantId"
     LEFT JOIN product_catalog pc ON pc.id = dp."productId" AND pc."tenantId" = dp."tenantId"
     WHERE dp."tenantId" = ${tenantId}
       AND d.status IN ('won', 'lost')

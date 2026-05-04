@@ -131,7 +131,9 @@ function MiniRanking({ title, icon: Icon, accent, items, emptyText }: {
 
 export default function ProductReports() {
   const [, navigate] = useLocation();
-  const dateFilter = useDateFilter("last3months");
+  // Default 'all' — gestor abre o dashboard e vê tudo o que foi vendido.
+  // Pode estreitar o range com o DateRangeFilter no header.
+  const dateFilter = useDateFilter("all");
 
   const filterInput = useMemo(() => ({
     dateFrom: dateFilter.dates.dateFrom,
