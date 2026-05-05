@@ -535,6 +535,7 @@ export const pipelineStages = pgTable("pipeline_stages", {
   isLost: boolean("isLost").default(false).notNull(),
   coolingEnabled: boolean("coolingEnabled").default(false).notNull(),
   coolingDays: integer("coolingDays").default(3),
+  coolingMinutes: integer("coolingMinutes"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 }, (t) => [index("ps_tenant_pipeline_idx").on(t.tenantId, t.pipelineId)]);
 

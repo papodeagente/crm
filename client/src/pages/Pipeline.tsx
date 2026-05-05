@@ -609,7 +609,12 @@ export default function Pipeline() {
                 const stageDeals = sortedDeals.filter((d: any) => d.stageId === stage.id);
                 const stageValue = stageDeals.reduce((sum: number, d: any) => sum + (d.valueCents || 0), 0);
                 const isDragOver = dragOverStageId === stage.id;
-                const coolingMs = stage.coolingEnabled && stage.coolingDays ? (stage.coolingDays as number) * 86400000 : 0;
+                // coolingMinutes (se preenchido) é a fonte da verdade; caso contrário cai pra coolingDays.
+                const coolingMs = stage.coolingEnabled
+                  ? (stage.coolingMinutes != null
+                      ? Number(stage.coolingMinutes) * 60_000
+                      : (Number(stage.coolingDays) || 3) * 86400000)
+                  : 0;
 
                 return (
                   <div

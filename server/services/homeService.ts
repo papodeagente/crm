@@ -232,10 +232,11 @@ export async function getHomeExecutive(tenantId: number, userId?: number, teamId
     lastActivityAt: r.lastActivityAt ? new Date(r.lastActivityAt).getTime() : null,
   }));
 
-  // 4. Cooling deals — uses per-stage coolingEnabled + coolingDays from pipeline config
+  // 4. Cooling deals — usa coolingMinutes (fonte da verdade) com fallback pra coolingDays*1440.
+  //    Default 4320 min (3 dias) preserva comportamento anterior se ambas as colunas forem null.
   const coolingResult = await db.execute(sql`
     SELECT d.id, d.title, d."valueCents", d."ownerUserId", d."stageId", d."createdAt", d."lastActivityAt",
-           ps.name as stageName, ps."coolingDays",
+           ps.name as stageName, ps."coolingDays", ps."coolingMinutes",
            c.name as contactName,
            u.name as ownerName
     FROM deals d
@@ -247,7 +248,7 @@ export async function getHomeExecutive(tenantId: number, userId?: number, teamId
       AND d."deletedAt" IS NULL
       AND d.status = 'open'
       ${ownerFilter}
-      AND COALESCE(d."lastActivityAt", d."createdAt") < NOW() - INTERVAL '1 day' * COALESCE(ps."coolingDays", 3)
+      AND COALESCE(d."lastActivityAt", d."createdAt") < NOW() - INTERVAL '1 minute' * COALESCE(ps."coolingMinutes", ps."coolingDays" * 1440, 4320)
     ORDER BY COALESCE(d."lastActivityAt", d."createdAt") ASC
     LIMIT 100
   `);
@@ -260,6 +261,7 @@ export async function getHomeExecutive(tenantId: number, userId?: number, teamId
     ownerName: r.ownerName ? String(r.ownerName) : "",
     lastActivityAt: r.lastActivityAt ? new Date(r.lastActivityAt).getTime() : new Date(r.createdAt).getTime(),
     coolingDays: Number(r.coolingDays) || 3,
+    coolingMinutes: r.coolingMinutes != null ? Number(r.coolingMinutes) : null,
   }));
 
   return {

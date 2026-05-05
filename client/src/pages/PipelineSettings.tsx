@@ -32,6 +32,7 @@ interface StageData {
   color: string | null; orderIndex: number; probabilityDefault: number | null;
   isWon: number | boolean; isLost: number | boolean;
   coolingEnabled: number | boolean; coolingDays: number | null;
+  coolingMinutes: number | null;
   createdAt: string;
 }
 interface AutomationData {
@@ -60,6 +61,102 @@ const STAGE_COLORS = [
   "#10b981", "#3b82f6", "#8b5cf6", "#f59e0b", "#ef4444",
   "#06b6d4", "#ec4899", "#84cc16", "#f97316", "#6366f1",
 ];
+
+/* ─── Cooling helpers ───
+   Fonte da verdade é coolingMinutes; coolingDays é fallback (registros legados).
+   Default = 3 dias (4320 min) preserva comportamento histórico. */
+type CoolingUnit = "minutes" | "hours" | "days";
+function getCoolingMinutes(s: { coolingMinutes?: number | null; coolingDays?: number | null }): number {
+  if (s.coolingMinutes != null) return Number(s.coolingMinutes);
+  return (Number(s.coolingDays) || 3) * 1440;
+}
+function bestCoolingUnit(min: number): CoolingUnit {
+  if (min > 0 && min % 1440 === 0) return "days";
+  if (min > 0 && min % 60 === 0) return "hours";
+  return "minutes";
+}
+function coolingUnitMultiplier(u: CoolingUnit): number {
+  return u === "days" ? 1440 : u === "hours" ? 60 : 1;
+}
+function formatCoolingShort(min: number): string {
+  if (min % 1440 === 0) { const d = min / 1440; return `${d} ${d === 1 ? "dia" : "dias"}`; }
+  if (min % 60 === 0) { const h = min / 60; return `${h} ${h === 1 ? "hora" : "horas"}`; }
+  return `${min} ${min === 1 ? "minuto" : "minutos"}`;
+}
+
+/* ─── Subcomponente: controle inline de cooling com selector de unidade ─── */
+function CoolingInline({
+  stage, onToggle, onChange,
+}: {
+  stage: StageData;
+  onToggle: (checked: boolean) => void;
+  onChange: (minutes: number) => void;
+}) {
+  const initialMin = getCoolingMinutes(stage);
+  const initialUnit = bestCoolingUnit(initialMin);
+  const [unit, setUnit] = useState<CoolingUnit>(initialUnit);
+  const [value, setValue] = useState<number>(initialMin / coolingUnitMultiplier(initialUnit));
+
+  useEffect(() => {
+    const min = getCoolingMinutes(stage);
+    const u = bestCoolingUnit(min);
+    setUnit(u);
+    setValue(min / coolingUnitMultiplier(u));
+  }, [stage.coolingMinutes, stage.coolingDays, stage.coolingEnabled]);
+
+  const maxByUnit: Record<CoolingUnit, number> = { minutes: 43200, hours: 720, days: 90 };
+
+  function commit(nextValue: number, nextUnit: CoolingUnit) {
+    const v = Math.max(1, Math.min(maxByUnit[nextUnit], nextValue));
+    onChange(v * coolingUnitMultiplier(nextUnit));
+  }
+
+  return (
+    <div className="mt-2 pt-2 border-t border-border/30 flex items-center gap-3 flex-wrap">
+      <Thermometer className="h-3.5 w-3.5 text-amber-500 shrink-0 ml-8" />
+      <span className="text-[11px] text-muted-foreground whitespace-nowrap">Destacar negociações esfriando na etapa</span>
+      <Switch
+        checked={!!stage.coolingEnabled}
+        onCheckedChange={onToggle}
+        className="scale-75"
+      />
+      {!!stage.coolingEnabled && (
+        <div className="flex items-center gap-1.5">
+          <span className="text-[11px] text-muted-foreground">após</span>
+          <Input
+            type="number"
+            min={1}
+            max={maxByUnit[unit]}
+            value={value}
+            onChange={(e) => {
+              const n = parseInt(e.target.value) || 1;
+              setValue(n);
+              commit(n, unit);
+            }}
+            className="h-6 w-16 text-[11px] text-center px-1"
+          />
+          <Select
+            value={unit}
+            onValueChange={(v) => {
+              const next = v as CoolingUnit;
+              setUnit(next);
+              commit(value, next);
+            }}
+          >
+            <SelectTrigger className="h-6 w-[88px] text-[11px] px-2">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="minutes">minutos</SelectItem>
+              <SelectItem value="hours">horas</SelectItem>
+              <SelectItem value="days">dias</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      )}
+    </div>
+  );
+}
 
 /* ─── Main Page ─── */
 export default function PipelineSettings() {
@@ -420,7 +517,7 @@ export default function PipelineSettings() {
                             <span className="text-[11px] text-muted-foreground">Prob: {s.probabilityDefault || 0}%</span>
                             {s.isWon ? <span className="text-[11px] text-emerald-400 font-medium">Etapa de Ganho</span> : null}
                             {s.isLost ? <span className="text-[11px] text-red-400 font-medium">Etapa de Perda</span> : null}
-                            {!!s.coolingEnabled && <span className="text-[11px] text-amber-400 font-medium">Esfriando: {s.coolingDays || 3} dias</span>}
+                            {!!s.coolingEnabled && <span className="text-[11px] text-amber-400 font-medium">Esfriando: {formatCoolingShort(getCoolingMinutes(s))}</span>}
                           </div>
                         </div>
                         <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -438,35 +535,16 @@ export default function PipelineSettings() {
                           </button>
                         </div>
                       </div>
-                      {/* Cooling config inline */}
-                      <div className="mt-2 pt-2 border-t border-border/30 flex items-center gap-3">
-                        <Thermometer className="h-3.5 w-3.5 text-amber-500 shrink-0 ml-8" />
-                        <span className="text-[11px] text-muted-foreground whitespace-nowrap">Destacar negociações esfriando na etapa</span>
-                        <Switch
-                          checked={!!s.coolingEnabled}
-                          onCheckedChange={(checked) => {
-                            updateStage.mutate({ id: s.id, coolingEnabled: checked, coolingDays: s.coolingDays || 3 });
-                          }}
-                          className="scale-75"
-                        />
-                        {!!s.coolingEnabled && (
-                          <div className="flex items-center gap-1.5">
-                            <span className="text-[11px] text-muted-foreground">após</span>
-                            <Input
-                              type="number"
-                              min={1}
-                              max={90}
-                              value={s.coolingDays || 3}
-                              onChange={(e) => {
-                                const days = parseInt(e.target.value) || 1;
-                                updateStage.mutate({ id: s.id, coolingDays: Math.max(1, Math.min(90, days)) });
-                              }}
-                              className="h-6 w-14 text-[11px] text-center px-1"
-                            />
-                            <span className="text-[11px] text-muted-foreground">dias</span>
-                          </div>
-                        )}
-                      </div>
+                      {/* Cooling config inline — minutos/horas/dias */}
+                      <CoolingInline
+                        stage={s}
+                        onToggle={(checked) =>
+                          updateStage.mutate({ id: s.id, coolingEnabled: checked, coolingMinutes: getCoolingMinutes(s) })
+                        }
+                        onChange={(minutes) =>
+                          updateStage.mutate({ id: s.id, coolingMinutes: minutes })
+                        }
+                      />
                     </div>
                   ))}
                   {sortedStages.length === 0 && (

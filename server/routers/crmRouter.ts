@@ -372,7 +372,7 @@ const tenantId = getTenantId(ctx); const { id, ...data } = input;
         return crm.createStage({ ...input, tenantId: getTenantId(ctx) });
       }),
     updateStage: tenantWriteProcedure
-      .input(z.object({ id: z.number(), name: z.string().optional(), color: z.string().optional(), orderIndex: z.number().optional(), probabilityDefault: z.number().optional(), isWon: z.boolean().optional(), isLost: z.boolean().optional(), coolingEnabled: z.boolean().optional(), coolingDays: z.number().optional() }))
+      .input(z.object({ id: z.number(), name: z.string().optional(), color: z.string().optional(), orderIndex: z.number().optional(), probabilityDefault: z.number().optional(), isWon: z.boolean().optional(), isLost: z.boolean().optional(), coolingEnabled: z.boolean().optional(), coolingDays: z.number().optional(), coolingMinutes: z.number().int().min(1).max(525600).nullable().optional() }))
       .mutation(async ({ input, ctx }) => {
 const tenantId = getTenantId(ctx); const { id, ...data } = input;
         return crm.updateStage(tenantId, id, data);
