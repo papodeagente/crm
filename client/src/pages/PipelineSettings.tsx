@@ -174,7 +174,7 @@ export default function PipelineSettings() {
   // Stage dialogs
   const [showStageDialog, setShowStageDialog] = useState(false);
   const [editingStage, setEditingStage] = useState<StageData | null>(null);
-  const [stageForm, setStageForm] = useState({ name: "", color: "#10b981", probabilityDefault: 0, isWon: false, isLost: false });
+  const [stageForm, setStageForm] = useState({ name: "", color: "#10b981", probabilityDefault: 0 });
 
   // Automation dialogs
   const [showAutoDialog, setShowAutoDialog] = useState(false);
@@ -294,12 +294,12 @@ export default function PipelineSettings() {
   function openCreateStage() {
     if (!selectedPipelineId) return;
     setEditingStage(null);
-    setStageForm({ name: "", color: STAGE_COLORS[sortedStages.length % STAGE_COLORS.length], probabilityDefault: 0, isWon: false, isLost: false });
+    setStageForm({ name: "", color: STAGE_COLORS[sortedStages.length % STAGE_COLORS.length], probabilityDefault: 0 });
     setShowStageDialog(true);
   }
   function openEditStage(s: StageData) {
     setEditingStage(s);
-    setStageForm({ name: s.name, color: s.color || "#10b981", probabilityDefault: s.probabilityDefault || 0, isWon: !!s.isWon, isLost: !!s.isLost });
+    setStageForm({ name: s.name, color: s.color || "#10b981", probabilityDefault: s.probabilityDefault || 0 });
     setShowStageDialog(true);
   }
   function saveStage() {
@@ -737,26 +737,6 @@ export default function PipelineSettings() {
                 </div>
               </div>
             </div>
-            <div className="flex gap-6">
-              <label className="flex items-center gap-2 cursor-pointer">
-                <Switch checked={stageForm.isWon} onCheckedChange={v => setStageForm(f => ({ ...f, isWon: v, isLost: v ? false : f.isLost }))} />
-                <span className="text-[13px] text-foreground">Etapa de Ganho</span>
-              </label>
-              <label className="flex items-center gap-2 cursor-pointer">
-                <Switch checked={stageForm.isLost} onCheckedChange={v => setStageForm(f => ({ ...f, isLost: v, isWon: v ? false : f.isWon }))} />
-                <span className="text-[13px] text-foreground">Etapa de Perda</span>
-              </label>
-            </div>
-            {(stageForm.isWon || stageForm.isLost) && (
-              <div className="flex items-start gap-2 p-3 rounded-lg bg-amber-500/10 border border-amber-500/20">
-                <AlertTriangle className="h-4 w-4 text-amber-400 shrink-0 mt-0.5" />
-                <p className="text-[12px] text-amber-300">
-                  {stageForm.isWon
-                    ? "Negociações nesta etapa serão marcadas como ganhas. Automações de 'Venda Ganha' serão disparadas."
-                    : "Negociações nesta etapa serão marcadas como perdidas."}
-                </p>
-              </div>
-            )}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowStageDialog(false)}>Cancelar</Button>
