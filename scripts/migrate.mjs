@@ -24,15 +24,14 @@ async function migrate() {
     throw err;
   }
 
-  // Read migration files from journal
-  const journalPath = path.join(drizzleDir, 'meta', '_journal.json');
-  let migrationFiles = [];
-  if (fs.existsSync(journalPath)) {
-    const journal = JSON.parse(fs.readFileSync(journalPath, 'utf8'));
-    migrationFiles = (journal.entries || []).map(e => `${e.tag}.sql`);
-  } else {
-    migrationFiles = fs.readdirSync(drizzleDir).filter(f => f.endsWith('.sql')).sort();
-  }
+  // Always scan all SQL files (sorted). Migrations são idempotentes (CREATE TABLE
+  // IF NOT EXISTS, ADD COLUMN IF NOT EXISTS) e os erros "já existe" são tolerados
+  // pelos códigos 42710/42P07/42701 abaixo. O journal foi removido como fonte da
+  // verdade porque entries fora do journal (aplicadas manualmente) eram puladas
+  // no startup, deixando o schema do código fora de sincronia com o banco.
+  const migrationFiles = fs.readdirSync(drizzleDir)
+    .filter(f => f.endsWith('.sql'))
+    .sort();
 
   console.log(`[Migrate] Found ${migrationFiles.length} migration files`);
 
